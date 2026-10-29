@@ -7,6 +7,7 @@
 //   node vps/local.mjs rotate-admin             new admin password, shown once
 //   node vps/local.mjs show-admin               show the current admin password
 //   node vps/local.mjs seed-users               create/update accounts from .secrets/users.local.json
+//   node vps/local.mjs rename <user> <name>     change the name people see, e.g. rename admin Biloy
 //   node vps/local.mjs status                   containers, health, backups
 //   node vps/local.mjs smoke                    end-to-end check on the box (as admin)
 //   node vps/local.mjs smoke-public             end-to-end check through the public HTTPS address
@@ -84,6 +85,15 @@ switch (cmd) {
     }
     break;
   }
+  case 'rename': {
+    const [who, ...words] = rest;
+    const name = words.join(' ').trim();
+    if (!who || !name) fail('usage: node vps/local.mjs rename <username> <display name>');
+    // Single-quoted for the remote shell; a quote inside the name is closed, escaped and reopened.
+    const q = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
+    remote(`~/asanaka/asanaka admin rename ${q(who)} ${q(name)}`);
+    break;
+  }
   case 'status':
     remote('~/asanaka/asanaka status');
     break;
@@ -97,6 +107,6 @@ switch (cmd) {
     break;
   }
   default:
-    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 14).join('\n'));
+    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(1, 15).join('\n'));
     process.exitCode = cmd ? 1 : 0;
 }

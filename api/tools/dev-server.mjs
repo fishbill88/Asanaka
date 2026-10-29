@@ -31,7 +31,7 @@ await app.ready();
 const fresh = !(await db.query('SELECT 1 FROM users LIMIT 1')).rows[0];
 if (fresh || !existsSync(loginsPath)) {
   const logins = [
-    { username: 'admin', password: randomPassword(), displayName: 'Admin', role: 'admin' },
+    { username: 'admin', password: randomPassword(), displayName: 'Biloy', role: 'admin' },
     { username: 'ameerperalta', password: randomPassword(), displayName: 'Ameer Peralta', role: 'member' },
   ];
   for (const u of logins) await setUser(db, u);

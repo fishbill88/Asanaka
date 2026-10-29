@@ -4,7 +4,7 @@
 #   status                    containers, health, last backups
 #   logs [api|db]             follow a log (Ctrl-C to stop)
 #   psql                      SQL shell on the Asanaka database
-#   admin <args...>           account tool: list | disable <name> | enable <name> | sign-out <name>
+#   admin <args...>           account tool: list | rename <name> <display name> | disable <name> | enable <name> | sign-out <name>
 #   set-user                  create or update an account; JSON {"username","password",...} on stdin
 #   admin-password --rotate   new admin password: signs admin out everywhere, stored here (600), printed once
 #   admin-password --show     print the current admin password

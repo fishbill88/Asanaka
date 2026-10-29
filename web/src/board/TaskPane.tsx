@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
-import { ApiError, api, type TaskFields } from '../lib/api';
-import type { Activity, Board, Comment, Priority, Section, Status, Task, TaskDetail } from '../types';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from 'react';
+import { ApiError, api, deleteAttachment, messageOf, uploadAttachment, type TaskFields } from '../lib/api';
+import type { Activity, Attachment, Board, Comment, Priority, Section, Status, Task, TaskDetail } from '../types';
+import { FileTile, Lightbox, NotesView, markerFor, openAttachment } from './Attachments';
 import type { BoardEngine } from './engine';
 import { PRIORITY, STATUS, initials, toneOf, when } from './format';
 import { EASE_OUT, reduced } from './motion';
@@ -16,6 +17,8 @@ interface Props {
   onClosed(): void;
   /** A save was refused: report it and reload the board. */
   onFailure(err: unknown): void;
+  /** Something to tell the visitor that needs no reload (a file too big, an upload that failed). */
+  onNotice(message: string): void;
 }
 
 const Check = () => (
@@ -23,6 +26,9 @@ const Check = () => (
 );
 const Close = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+);
+const Clip = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.1-7.1a4 4 0 0 0-5.7-5.7l-7.1 7.1a6 6 0 0 0 8.5 8.5l5.3-5.3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
 
 export function Avatar({ board, id }: { board: Board; id: string | null }) {
@@ -43,26 +49,36 @@ function describe(a: Activity, sectionName: (id: unknown) => string) {
     case 'edited': return `changed ${list(((a.data.fields as string[]) ?? []).map((f) => FIELD_NAMES[f] ?? f))}`;
     case 'commented': return 'commented';
     case 'subtask-added': return 'added a subtask';
+    case 'attached': return `attached ${String(a.data.name ?? 'a file')}`;
+    case 'attachment-removed': return `removed ${String(a.data.name ?? 'an attachment')}`;
     default: return a.kind.replace(/-/g, ' ');
   }
 }
 
 let tmp = 0;
 const tempId = () => `tmp-pane-${++tmp}`;
+const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
-export function TaskPane({ taskId, open, engine, board, sections, me, onClose, onClosed, onFailure }: Props) {
+export function TaskPane({ taskId, open, engine, board, sections, me, onClose, onClosed, onFailure, onNotice }: Props) {
   const pane = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [shown, setShown] = useState(false);
   const [task, setTask] = useState<Task | undefined>(() => engine.get(taskId));
   const [detail, setDetail] = useState<TaskDetail | null>(null);
   const [title, setTitle] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotesState] = useState('');
+  const notesLive = useRef('');
+  const [editingNotes, setEditingNotes] = useState(false);
   const [newSub, setNewSub] = useState('');
   const [say, setSay] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [uploading, setUploading] = useState(0);
+  const [dropping, setDropping] = useState(false);
+  const [viewing, setViewing] = useState<Attachment | null>(null);
   const t = task ?? detail?.task;
+  const setNotes = useCallback((v: string) => { notesLive.current = v; setNotesState(v); }, []);
 
   // Slide in on the next frame (so the closed position is painted first); slide out, then unmount.
   useEffect(() => {
@@ -71,7 +87,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     return () => cancelAnimationFrame(id);
   }, [open]);
 
-  // A different task: show what the board already knows, then load subtasks, comments and activity.
+  // A different task: show what the board already knows, then load subtasks, comments, files and activity.
   const load = useCallback(() => api.task(taskId), [taskId]);
   useEffect(() => {
     let alive = true;
@@ -79,9 +95,11 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     setTask(known ? { ...known } : undefined);
     setTitle(known?.title ?? '');
     setNotes(known?.notes ?? '');
+    setEditingNotes(false);
     setDetail(null);
     setConfirmDelete(false);
     setNewSub('');
+    setViewing(null);
     load().then((d) => {
       if (!alive) return;
       setDetail(d);
@@ -94,11 +112,11 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     });
     const off = engine.subscribe((x) => { if (x.id === taskId) setTask({ ...x }); });
     return () => { alive = false; off(); };
-  }, [taskId, engine, load, onClose, onFailure]);
+  }, [taskId, engine, load, onClose, onFailure, setNotes]);
 
   // Changes made elsewhere (the board, a reload) reach the drafts unless you're typing in them.
   useEffect(() => { if (t && document.activeElement !== titleRef.current) setTitle(t.title); }, [t?.title]);
-  useEffect(() => { if (t && document.activeElement !== notesRef.current) setNotes(t.notes); }, [t?.notes]);
+  useEffect(() => { if (t && document.activeElement !== notesRef.current && !notesLive.current.includes('](uploading:')) setNotes(t.notes); }, [t?.notes, setNotes]);
 
   useLayoutEffect(() => {
     const ta = titleRef.current;
@@ -122,12 +140,17 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     return () => clearTimeout(id);
   }, [shown, taskId]);
 
+  // Escape closes the lightbox first, then the pane.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented && !engine.isDragging()) onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || engine.isDragging()) return;
+      if (viewing) { setViewing(null); return; }
+      onClose();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, engine, onClose]);
+  }, [open, engine, onClose, viewing]);
 
   const refreshing = useRef(0);
   const refreshSoon = useCallback((after: Promise<unknown>) => {
@@ -145,6 +168,38 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     refreshSoon(req);
   }, [engine, taskId, refreshSoon]);
 
+  // Files: each upload adds a tile; files pasted or dropped into the description also leave a marker there,
+  // first "Uploading…", then the image or file itself. The description saves once it holds no pending marker.
+  const countFiles = (delta: number) => engine.patch(taskId, { attachmentCount: Math.max(0, (engine.get(taskId)?.attachmentCount ?? 0) + delta) });
+  const replaceInNotes = (from: string, to: string) => {
+    const next = notesLive.current.replace(from, to).replace(/\n{3,}/g, '\n\n');
+    setNotes(next);
+    if (document.activeElement !== notesRef.current && !next.includes('](uploading:') && next !== engine.get(taskId)?.notes) saveFields({ notes: next });
+  };
+  const sendFiles = (files: File[], into?: { at: number }) => {
+    if (!files.length) return;
+    const tokens = files.map((f) => `[Uploading ${(f.name && f.name !== 'image.png' ? f.name : 'pasted image').replace(/[[\]\n]/g, '')}…](uploading:${tempId()})`);
+    if (into) {
+      const cur = notesLive.current;
+      const before = cur.slice(0, into.at), after = cur.slice(into.at);
+      const pad = (s: string, side: 'start' | 'end') => (s && !(side === 'start' ? s.endsWith('\n') : s.startsWith('\n')) ? '\n' : '');
+      setNotes(`${before}${pad(before, 'start')}${tokens.join('\n')}${pad(after, 'end')}${after}`);
+    }
+    files.forEach((file, i) => {
+      setUploading((n) => n + 1);
+      const req = uploadAttachment(taskId, file);
+      req.then((a) => {
+        setDetail((d) => d && { ...d, attachments: [...d.attachments, a] });
+        countFiles(1);
+        if (into) replaceInNotes(tokens[i]!, markerFor(a));
+      }, (err) => {
+        if (into) replaceInNotes(tokens[i]!, '');
+        onNotice(messageOf(err));
+      }).finally(() => setUploading((n) => n - 1));
+      refreshSoon(req);
+    });
+  };
+
   if (!t) return null;
 
   const commitTitle = () => {
@@ -152,12 +207,17 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     if (!v) setTitle(t.title);
     else if (v !== t.title) saveFields({ title: v });
   };
-  const commitNotes = () => { if (notes !== t.notes) saveFields({ notes }); };
+  const commitNotes = () => {
+    const v = notesLive.current;
+    if (v !== t.notes && !v.includes('](uploading:')) saveFields({ notes: v });
+  };
 
   const sectionName = (id: unknown) => sections.find((s) => s.id === id)?.name ?? 'another section';
   const userName = (id: string) => board.users.find((u) => u.id === id)?.displayName ?? 'Someone';
   const subtasks = detail?.subtasks ?? [];
   const comments = detail?.comments ?? [];
+  const attachments = detail?.attachments ?? [];
+  const open_ = (a: Attachment) => { openAttachment(a, setViewing).catch((err) => onNotice(messageOf(err))); };
 
   const toggleSub = (s: Task) => {
     if (s.id.startsWith('tmp-')) return;
@@ -198,10 +258,37 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     requestAnimationFrame(() => pane.current?.querySelector('.pane-comments li:last-child')?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }));
   };
 
+  const removeFile = (a: Attachment) => {
+    setDetail((d) => d && { ...d, attachments: d.attachments.filter((x) => x.id !== a.id) });
+    countFiles(-1);
+    const req = deleteAttachment(a.id);
+    req.catch(onFailure);
+    refreshSoon(req);
+  };
+
   const deleteTask = () => {
     engine.remove(taskId);
     api.deleteTask(taskId).catch(onFailure);
     onClose();
+  };
+
+  // Pasting or dropping files into the description uploads them where the caret is.
+  const filesIn = (data: DataTransfer | null) => [...(data?.files ?? [])];
+  const onNotesPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = filesIn(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    sendFiles(files, { at: e.currentTarget.selectionStart ?? notesLive.current.length });
+  };
+  const onNotesDrop = (e: DragEvent<HTMLElement>) => {
+    const files = filesIn(e.dataTransfer);
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropping(false);
+    const at = e.currentTarget === notesRef.current ? notesRef.current.selectionStart ?? notesLive.current.length : notesLive.current.length;
+    setEditingNotes(true);
+    sendFiles(files, { at });
   };
 
   const seg = <V extends string>(label: string, field: 'priority' | 'status', options: Record<V, string>, value: V | null) => (
@@ -217,14 +304,25 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     </div>
   );
 
+  const showNotesView = !editingNotes && notes.trim() !== '';
+
   return (
     <aside
       ref={pane}
-      className={`pane${shown ? ' is-open' : ''}`}
+      className={`pane${shown ? ' is-open' : ''}${dropping ? ' is-dropping' : ''}`}
       aria-label="Task details"
       tabIndex={-1}
       inert={!open}
       onTransitionEnd={(e) => { if (e.target === pane.current && !open) onClosed(); }}
+      onDragOver={(e) => { if (hasFiles(e)) { e.preventDefault(); setDropping(true); } }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) setDropping(false); }}
+      onDrop={(e) => {
+        const files = filesIn(e.dataTransfer);
+        setDropping(false);
+        if (!files.length) return;
+        e.preventDefault();
+        sendFiles(files);
+      }}
     >
       <div className="pane-bar">
         <button type="button" className="pane-complete" aria-pressed={t.completed} onClick={() => engine.toggle(taskId)}>
@@ -269,9 +367,44 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
         </dl>
 
         <div className="pane-block">
-          <label className="pane-h" htmlFor="pane-notes">Description</label>
-          <textarea id="pane-notes" ref={notesRef} className="pane-notes" rows={3} maxLength={20000} placeholder="What is this task about?"
-            value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={commitNotes} />
+          <label className="pane-h" htmlFor="pane-notes" id="pane-notes-label">Description</label>
+          {showNotesView ? (
+            <div
+              className="pane-notes pane-notes-view" role="button" tabIndex={0} aria-labelledby="pane-notes-label" aria-describedby="pane-notes-hint"
+              onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) setEditingNotes(true); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) { e.preventDefault(); setEditingNotes(true); } }}
+              onDragOver={(e) => { if (hasFiles(e)) e.preventDefault(); }}
+              onDrop={onNotesDrop}
+            >
+              <NotesView text={notes} attachments={attachments} onOpen={open_} />
+              <span className="sr-only" id="pane-notes-hint">Press Enter to edit.</span>
+            </div>
+          ) : (
+            <textarea
+              id="pane-notes" ref={notesRef} className="pane-notes" rows={3} maxLength={20000} autoFocus={editingNotes}
+              placeholder="What is this task about? Paste or drop images and files here."
+              value={notes} onChange={(e) => setNotes(e.target.value)}
+              onFocus={() => setEditingNotes(true)}
+              onBlur={() => { commitNotes(); setEditingNotes(false); }}
+              onPaste={onNotesPaste}
+              onDragOver={(e) => { if (hasFiles(e)) e.preventDefault(); }}
+              onDrop={onNotesDrop}
+            />
+          )}
+        </div>
+
+        <div className="pane-block">
+          <div className="pane-h-row">
+            <h2 className="pane-h">Attachments{attachments.length > 0 && <span className="pane-sub-count">{attachments.length}</span>}</h2>
+            <button type="button" className="pane-attach" onClick={() => fileInput.current?.click()}><Clip />Attach files</button>
+            <input ref={fileInput} type="file" multiple hidden onChange={(e) => { sendFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
+          </div>
+          {uploading > 0 && <p className="pane-empty" role="status">Uploading {uploading} file{uploading === 1 ? '' : 's'}…</p>}
+          {attachments.length > 0 ? (
+            <ul className="pane-files">
+              {attachments.map((a) => <FileTile key={a.id} a={a} onOpen={() => open_(a)} onRemove={() => removeFile(a)} />)}
+            </ul>
+          ) : !uploading && detail && <p className="pane-empty">Drop files on this panel, or paste an image into the description.</p>}
         </div>
 
         <div className="pane-block">
@@ -346,6 +479,9 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) postComment(); }} />
         <button type="submit" className="bd-btn">Comment</button>
       </form>
+
+      {dropping && <div className="pane-drop" aria-hidden="true"><span>Drop to attach</span></div>}
+      {viewing && <Lightbox a={viewing} onClose={() => setViewing(null)} />}
     </aside>
   );
 }

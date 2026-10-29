@@ -58,6 +58,7 @@ const ICON = {
   more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.9" fill="currentColor"/><circle cx="12" cy="12" r="1.9" fill="currentColor"/><circle cx="18.5" cy="12" r="1.9" fill="currentColor"/></svg>',
   subtasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v10a3 3 0 0 0 3 3h6M6 9h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="9" r="2.2" fill="currentColor"/><circle cx="18" cy="17" r="2.2" fill="currentColor"/></svg>',
   comment: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H10l-4 4v-4H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+  clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.1-7.1a4 4 0 0 0-5.7-5.7l-7.1 7.1a6 6 0 0 0 8.5 8.5l5.3-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -184,7 +185,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       (t.status ? `<span class="bd-chip" data-v="${t.status}">${STATUS[t.status]}</span>` : '');
     const counts =
       (t.subtaskCount ? `<span class="bd-count" title="Subtasks done">${ICON.subtasks}${t.subtaskDoneCount}/${t.subtaskCount}</span>` : '') +
-      (t.commentCount ? `<span class="bd-count" title="Comments">${ICON.comment}${t.commentCount}</span>` : '');
+      (t.commentCount ? `<span class="bd-count" title="Comments">${ICON.comment}${t.commentCount}</span>` : '') +
+      (t.attachmentCount ? `<span class="bd-count" title="Attachments">${ICON.clip}${t.attachmentCount}</span>` : '');
     const foot = t.assigneeId || d || counts
       ? `<div class="bd-foot">${avatar(t.assigneeId)}${d ? `<span class="bd-due" data-state="${d.state}">${d.label}</span>` : ''}${counts ? `<span class="bd-counts">${counts}</span>` : ''}</div>`
       : '';
@@ -686,7 +688,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const t: Task = {
       id: uid('tmp'), projectId: project.id, sectionId: sid, parentId: null, title, notes: '', assigneeId: null, dueOn: null,
       priority: null, status: null, completed: sid === doneId(), completedAt: null, previousSectionId: null, position: '',
-      createdAt: '', updatedAt: '', subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, likeCount: 0, liked: false,
+      createdAt: '', updatedAt: '', subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, attachmentCount: 0, likeCount: 0, liked: false,
     };
     tasks.set(t.id, t);
     const el = makeCard(t);

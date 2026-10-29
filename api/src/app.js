@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { HttpError } from './errors.js';
+import attachmentRoutes, { MAX_FILE } from './routes/attachments.js';
 import authRoutes from './routes/auth.js';
 import boardRoutes from './routes/board.js';
 
@@ -13,17 +14,24 @@ export function buildApp({ db, config, logger = false }) {
     origin: config.allowedOrigins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     allowedHeaders: ['Authorization', 'Content-Type'],
+    exposedHeaders: ['Content-Disposition'],
     maxAge: 600,
   });
+
+  // Uploads arrive as raw bytes; the per-route bodyLimit (attachments.js) decides how many.
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: MAX_FILE }, (req, body, done) => done(null, body));
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('Referrer-Policy', 'no-referrer');
-    if (req.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
+    if (req.url.startsWith('/api/') && !reply.hasHeader('Cache-Control')) reply.header('Cache-Control', 'no-store');
   });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof HttpError) return reply.code(err.status).send({ error: err.code, message: err.message });
+    if (err.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
+      return reply.code(413).send({ error: 'too-large', message: 'That file is over 10 MB. Attach a smaller one, or share a link to it instead.' });
+    }
     if (err.validation) {
       return reply.code(400).send({ error: 'invalid', message: `The request was missing something or had the wrong shape: ${err.message}.` });
     }
@@ -43,5 +51,6 @@ export function buildApp({ db, config, logger = false }) {
   const ctx = { db, config };
   authRoutes(app, ctx);
   boardRoutes(app, ctx);
+  attachmentRoutes(app, ctx);
   return app;
 }

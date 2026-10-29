@@ -20,7 +20,7 @@ const contentPolicy = (apiOrigin: string): Plugin => ({
   apply: 'build',
   transformIndexHtml(html) {
     const connect = ["'self'", apiOrigin].filter(Boolean).join(' ');
-    const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src ${connect}; base-uri 'self'; form-action 'self'`;
+    const policy = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src ${connect}; base-uri 'self'; form-action 'self'`;
     return html.replace('%CONTENT_POLICY%', policy);
   },
 });

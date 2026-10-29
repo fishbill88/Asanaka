@@ -4,6 +4,7 @@
 //
 //   set-user               stdin: {"username","password","displayName"?,"role"?} as JSON. Creates or updates.
 //   set-password <name>    stdin: the password. Creates the account if missing (role admin when name is "admin").
+//   rename <name> <display name...>   change the name people see (not a secret, so it may be an argument)
 //   list                   every account: username, name, role, disabled, open sessions
 //   disable <name>         block sign-in and end its sessions
 //   enable <name>          allow sign-in again
@@ -13,7 +14,7 @@ import { loadConfig } from '../src/config.js';
 import { fromPool, migrate } from '../src/db.js';
 import { setUser } from '../src/users.js';
 
-const [cmd, arg] = process.argv.slice(2);
+const [cmd, arg, ...rest] = process.argv.slice(2);
 const readStdin = async () => { let s = ''; for await (const c of process.stdin) s += c; return s.replace(/\r?\n$/, ''); };
 const fail = (msg) => { console.error(`  [x] ${msg}`); process.exit(1); };
 
@@ -33,9 +34,19 @@ try {
     case 'set-password': {
       if (!arg) fail('usage: set-password <username>   (password on stdin)');
       const password = await readStdin();
+      // A new admin account is named Admin; an existing one keeps whatever name it was given.
       const isAdmin = arg.toLowerCase() === 'admin';
-      const { user, created } = await setUser(db, { username: arg, password, ...(isAdmin ? { role: 'admin', displayName: 'Admin' } : {}) });
+      const exists = (await db.query('SELECT 1 FROM users WHERE lower(username) = lower($1)', [arg])).rows[0];
+      const { user, created } = await setUser(db, { username: arg, password, ...(isAdmin ? { role: 'admin', ...(exists ? {} : { displayName: 'Admin' }) } : {}) });
       console.log(`  ${created ? 'created' : 'new password for'} ${user.username}; every session of this account has ended`);
+      break;
+    }
+    case 'rename': {
+      const name = rest.join(' ').trim().replace(/s+/g, ' ');
+      if (!arg || !name || name.length > 60) fail('usage: rename <username> <display name, up to 60 characters>');
+      const r = (await db.query('UPDATE users SET display_name = $2, updated_at = now() WHERE lower(username) = lower($1) RETURNING username, display_name', [arg, name])).rows[0];
+      if (!r) fail(`no account named ${arg}`);
+      console.log(`  ${r.username} is now shown as ${r.display_name}`);
       break;
     }
     case 'list': {
@@ -62,7 +73,7 @@ try {
       break;
     }
     default:
-      console.log('  commands: set-user | set-password <name> | list | disable <name> | enable <name> | sign-out <name>');
+      console.log('  commands: set-user | set-password <name> | rename <name> <display name> | list | disable <name> | enable <name> | sign-out <name>');
       process.exitCode = cmd ? 1 : 0;
   }
 } catch (err) {

@@ -127,6 +127,7 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
           onClose={closePane}
           onClosed={() => setPaneId(null)}
           onFailure={fail}
+          onNotice={setToast}
         />
       )}
       <div ref={band} className="done-band" aria-hidden="true" hidden>

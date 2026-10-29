@@ -47,6 +47,7 @@ export interface Task {
   subtaskCount: number;
   subtaskDoneCount: number;
   commentCount: number;
+  attachmentCount: number;
   likeCount: number;
   liked: boolean;
 }
@@ -74,10 +75,21 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface Attachment {
+  id: string;
+  taskId: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  uploaderId: string;
+  createdAt: string;
+}
+
 export interface TaskDetail {
   task: Task;
   subtasks: Task[];
   comments: Comment[];
+  attachments: Attachment[];
   activity: Activity[];
 }
 

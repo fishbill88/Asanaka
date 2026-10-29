@@ -1,4 +1,5 @@
 import { HttpError, notFound } from '../errors.js';
+import { listAttachments } from './attachments.js';
 import { keyAt } from '../positions.js';
 import { publicUser } from '../users.js';
 
@@ -18,6 +19,7 @@ const COUNT_COLS = `
   (SELECT count(*) FROM tasks s WHERE s.parent_id = t.id AND s.deleted_at IS NULL)::int AS subtask_count,
   (SELECT count(*) FROM tasks s WHERE s.parent_id = t.id AND s.deleted_at IS NULL AND s.completed_at IS NOT NULL)::int AS subtask_done_count,
   (SELECT count(*) FROM comments c WHERE c.task_id = t.id)::int AS comment_count,
+  (SELECT count(*) FROM attachments a WHERE a.task_id = t.id)::int AS attachment_count,
   (SELECT count(*) FROM task_likes l WHERE l.task_id = t.id)::int AS like_count,
   EXISTS (SELECT 1 FROM task_likes l WHERE l.task_id = t.id AND l.user_id = $2) AS liked`;
 
@@ -27,7 +29,7 @@ const taskOut = (r) => ({
   priority: r.priority, status: r.status, completed: !!r.completed_at, completedAt: r.completed_at,
   previousSectionId: r.previous_section_id ?? null, position: r.position, createdAt: r.created_at, updatedAt: r.updated_at,
   subtaskCount: r.subtask_count ?? 0, subtaskDoneCount: r.subtask_done_count ?? 0,
-  commentCount: r.comment_count ?? 0, likeCount: r.like_count ?? 0, liked: !!r.liked,
+  commentCount: r.comment_count ?? 0, attachmentCount: r.attachment_count ?? 0, likeCount: r.like_count ?? 0, liked: !!r.liked,
 });
 const sectionOut = (r) => ({ id: r.id, projectId: r.project_id, name: r.name, position: r.position });
 const projectOut = (r) => ({ id: r.id, name: r.name, color: r.color, position: r.position, doneSectionId: r.done_section_id, createdAt: r.created_at });
@@ -292,6 +294,7 @@ export default function boardRoutes(app, { db }) {
       task: await taskWithCounts(db, task.id, req.user.id),
       subtasks: subtasks.map(taskOut),
       comments: comments.map((c) => ({ id: c.id, body: c.body, authorId: c.author_id, createdAt: c.created_at, editedAt: c.edited_at })),
+      attachments: await listAttachments(db, task.id),
       activity: activity.map((a) => ({ id: a.id, kind: a.kind, data: a.data, actorId: a.actor_id, createdAt: a.created_at })),
     };
   });

@@ -2,7 +2,13 @@
 # with the host name and port from .local/deploy.local.json; installed by site-sync.sh.
 {{API_HOST}} {
 	handle /api/* {
-		request_body {
+		# Attachments may be up to 10 MB (the API checks the exact limit); everything else stays small.
+		@upload path_regexp ^/api/tasks/[0-9a-fA-F-]+/attachments$
+		@small not path_regexp ^/api/tasks/[0-9a-fA-F-]+/attachments$
+		request_body @upload {
+			max_size 11MB
+		}
+		request_body @small {
 			max_size 1MB
 		}
 		encode zstd gzip

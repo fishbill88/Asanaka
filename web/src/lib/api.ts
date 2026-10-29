@@ -1,4 +1,4 @@
-import type { Board, Comment, Project, Section, Session, Task, TaskDetail, User } from '../types';
+import type { Attachment, Board, Comment, Project, Section, Session, Task, TaskDetail, User } from '../types';
 
 // The API's address is baked in at build time from the ASANAKA_API_ORIGIN repository variable. In
 // development the site calls its own origin and Vite passes /api through (see vite.config.ts).
@@ -16,13 +16,14 @@ let authLost: (() => void) | null = null;
 export const setToken = (t: string | null) => { token = t; };
 export const onAuthLost = (fn: (() => void) | null) => { authLost = fn; };
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, file?: Blob): Promise<T> {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (file) headers['Content-Type'] = 'application/octet-stream';
+  else if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res: Response;
   try {
-    res = await fetch(ORIGIN + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    res = await fetch(ORIGIN + path, { method, headers, body: file ?? (body === undefined ? undefined : JSON.stringify(body)) });
   } catch {
     throw new ApiError(0, 'offline', 'Couldn’t reach the board’s server. Check your connection and try again.');
   }
@@ -66,5 +67,44 @@ export const api = {
   addSubtask: (id: string, title: string) => write<{ task: Task }>('POST', `/api/tasks/${id}/subtasks`, { title }),
   addComment: (id: string, body: string) => write<{ comment: Comment }>('POST', `/api/tasks/${id}/comments`, { body }),
 };
+
+// ---- attachments
+export const MAX_FILE = 10 * 1024 * 1024;
+const MIME = /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/;
+
+// A pasted screenshot arrives as "image.png"; give it a name that says when it was pasted.
+function nameFor(file: File) {
+  if (file.name && file.name !== 'image.png') return file.name;
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  const ext = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'png';
+  return `Pasted image ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}.${ext}`;
+}
+
+export async function uploadAttachment(taskId: string, file: File): Promise<Attachment> {
+  const name = nameFor(file);
+  if (file.size > MAX_FILE) throw new ApiError(413, 'too-large', `${name} is over 10 MB. Attach a smaller file, or share a link to it instead.`);
+  if (file.size === 0) throw new ApiError(400, 'empty-file', `${name} is empty.`);
+  const q = new URLSearchParams({ name });
+  if (MIME.test(file.type)) q.set('type', file.type);
+  return (await request<{ attachment: Attachment }>('POST', `/api/tasks/${taskId}/attachments?${q}`, undefined, file)).attachment;
+}
+
+// Files need the bearer token, so they're fetched once and shown from a blob URL for the rest of the visit.
+const blobs = new Map<string, Promise<string>>();
+export function attachmentUrl(id: string): Promise<string> {
+  let url = blobs.get(id);
+  if (!url) {
+    url = fetch(`${ORIGIN}/api/attachments/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).then(async (res) => {
+      if (!res.ok) throw new ApiError(res.status, 'error', 'Couldn’t load that file. It may have been removed.');
+      return URL.createObjectURL(await res.blob());
+    });
+    blobs.set(id, url);
+    url.catch(() => blobs.delete(id));
+  }
+  return url;
+}
+export const deleteAttachment = (id: string) => write<{ ok: true }>('DELETE', `/api/attachments/${id}`);
+export const isImage = (a: Attachment) => /^image\/(png|jpe?g|gif|webp|avif|bmp|svg\+xml)$/.test(a.contentType);
 
 export const messageOf = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong. Try again in a moment.');

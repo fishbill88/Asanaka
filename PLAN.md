@@ -44,6 +44,9 @@ We copy Asana's board interactions, not its name, logo or artwork.
   assignee, due date, section, priority, status, description, subtasks, comments, activity.
 - Completing a task: the check fills, a short celebration plays, the card settles in *Done*.
   Unchecking puts it back in the section it came from.
+- Attachments (added 30 Oct 2026): files and images up to 10 MB each, from *Attach files*, by dropping
+  them on the task pane, or by pasting into the description, where they upload at once and images show in
+  place. Cards count them; images open in a lightbox.
 
 **v1.1 (phase 6–7)**: live updates between people, sort, likes, task activity feed, admin users page,
 multi-select drag, keyboard shortcuts (`Tab+Q` quick add, `Tab+Enter` complete).
@@ -109,6 +112,7 @@ tasks      (id uuid pk, project_id fk, section_id fk, parent_id fk null,       -
             completed_at null, completed_by null, previous_section_id null,
             position text, created_by, created_at, updated_at, deleted_at null)
 comments   (id uuid pk, task_id fk, author_id fk, body, created_at, edited_at null)
+attachments (id uuid pk, task_id fk, uploader_id fk, filename, content_type, size, data bytea, created_at)
 task_likes (task_id, user_id, pk both)
 activity   (id bigserial, project_id, task_id null, actor_id, kind, data jsonb, created_at)
 login_failures (ip inet, username citext, failures int, locked_until timestamptz, pk (ip, username))
@@ -132,6 +136,7 @@ Indexes: `tasks (section_id, position) where deleted_at is null and parent_id is
 | `PATCH /tasks/:id` | any field, including `{sectionId, position}` for a drag and `{completed}` |
 | `GET /tasks/:id` · `DELETE /tasks/:id` | full task with subtasks, comments, activity · soft delete |
 | `POST /tasks/:id/subtasks` · `POST /tasks/:id/comments` · `PUT/DELETE /tasks/:id/like` | |
+| `POST /tasks/:id/attachments?name=&type=` · `GET/DELETE /attachments/:id` | upload raw bytes (10 MB), download (always as a sandboxed attachment), remove |
 | `GET /projects/:id/events` | server-sent events: task and section changes by other people (phase 6) |
 | `GET/POST /admin/users` · `POST /admin/users/:id/password` | admin only (phase 7) |
 | `GET /healthz` | liveness for Docker and the deploy script |
@@ -235,6 +240,10 @@ Each phase ends with something that can be checked.
 3. Display name for `ameerperalta`: **Ameer Peralta**.
 4. Caddy restart: **any time** is fine.
 5. "Nahuman na." is the right Cebuano for "it's finished".
+
+Added 30 Oct 2026: the `admin` account is shown as **Biloy** (`node vps/local.mjs rename admin Biloy`; a
+password rotation keeps the name). Tasks take **attachments**; files are stored in Postgres so the nightly
+dump backs them up, and Caddy lets the upload path through at 11 MB while every other API call stays at 1 MB.
 
 ## 14. Risks
 
