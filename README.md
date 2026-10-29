@@ -23,10 +23,15 @@ Needs Node 22.12 or newer.
 
 ```
 npm install          # also turns on the secret-checking commit hook
-npm run dev          # the site at http://localhost:5173/Asanaka/
+npm run dev:api      # the API on PGlite at 127.0.0.1:7361, with a sample board (data in .local/dev-db)
+npm run dev          # the site at http://localhost:5173/Asanaka/; /api goes to the local API
 npm test             # API tests
 npm run build        # production build into web/dist
 ```
+
+The first `npm run dev:api` makes two local accounts, `admin` and `ameerperalta`, with fresh random
+passwords written to `.local/dev-logins.json`. They exist only on this PC. To point the dev site at
+another API instead, set `ASANAKA_DEV_API` (for example to the live API's origin) before `npm run dev`.
 
 ## The VPS
 

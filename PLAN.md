@@ -17,9 +17,9 @@ We copy Asana's board interactions, not its name, logo or artwork.
 | Area | Choice | Why |
 | --- | --- | --- |
 | Frontend | Vite + React 19 + TypeScript, static build | Pages serves static files only |
-| Drag and drop | dnd-kit (pointer, touch long-press, keyboard) | Accessible, handles cross-column sorting and autoscroll |
-| Motion | Motion (layout animation, drawer springs); GSAP + ScrollTrigger on the landing page only | Cards must reflow smoothly; the landing page gets the flashy scroll work |
-| Server state | TanStack Query, optimistic updates | A drag shows instantly and rolls back if the API refuses |
+| Drag and drop | The design prototype's own engine, ported to TypeScript (`web/src/board/engine.ts`): pointer, touch long-press, Alt + arrows | Design B's drag, card reflow and arc to Done were approved as built; porting keeps them exact (changed from dnd-kit in phase 4) |
+| Motion | Web Animations and CSS (FLIP reflow, drawer curve); GSAP + ScrollTrigger on the landing page only | Transform and opacity only; every move honours reduced motion |
+| Server state | Optimistic: a change shows at once, writes go out one at a time in order, a refused one reloads the board | No query library needed for one board at a time (changed from TanStack Query in phase 4) |
 | API | Node 22 + Fastify + `pg` | Same runtime as the other services on the box; schema validation built in |
 | Database | Postgres 16 in its own container, compose project `asanaka` | Isolated from every other tenant and from the host's Postgres |
 | Local dev DB | PGlite (Postgres compiled to WASM) | This PC has no Docker; tests still run real Postgres SQL |
@@ -70,10 +70,13 @@ nature, since the browser calls it, but it isn't a credential.
 
 ```
 web/                     Vite + React app (landing, sign-in, board)
+  src/board/             engine.ts (columns, cards, drag), TaskPane.tsx, BoardView.tsx, celebrate.ts
+  src/pages/             Home, SignIn, Workspace
 api/
   src/                   Fastify routes, auth, board logic
   migrations/            numbered SQL files, each applied once at start-up
   tools/admin.mjs        CLI: add user, set password (read from stdin), list, disable
+  tools/dev-server.mjs   the API on PGlite for local work (npm run dev:api)
   test/                  node:test suites against PGlite
 vps/
   docker-compose.yml     db + api, ports on 127.0.0.1 only, memory/CPU limits
@@ -220,7 +223,7 @@ Each phase ends with something that can be checked.
 | 1 | Repo scaffold: `web/`, `api/`, hooks, gitleaks, Pages workflow | **Done 29 Oct 2026.** Pages serves the app at the GitHub link; committing a fake `.env`, the real password or the server IP is refused |
 | 2 | API + schema, tested locally on PGlite | **Done 29 Oct 2026.** 23 tests: sign-in, lockout, sessions, board read, move ordering, complete/uncomplete, subtasks, comments, likes, sections |
 | 3 | VPS: compose, first deploy, Caddy site, seed users, password rotation, backups | **Done 29 Oct 2026.** Smoke passes on the box and through the public address; rotation verified; backups nightly |
-| 4 | Board UI: sections, cards, drag, composer, task pane, completion | Every v1 item in §2 works against the live API |
+| 4 | Board UI: sections, cards, drag, composer, task pane, completion | **Built 30 Oct 2026.** A 31-step browser drive (real mouse and keys) passes against the API on PGlite: sign-in, tick and untick, drags, Alt + arrows, composer, pane edits, sections, filters, deep links, phone. The live check follows the API deploy |
 | 5 | Landing + sign-in in the chosen design; production build on Pages | Signing in at the GitHub link as `ameerperalta` opens the board, end to end |
 | 6 | Realtime, sort, likes, activity | Two browsers see each other's moves within a second |
 | 7 | Admin users page, accessibility and mobile pass, reduced motion | Keyboard-only drag works; the phone layout passes; admin can reset a password |
