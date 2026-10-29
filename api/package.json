@@ -10,6 +10,12 @@
     "test": "node --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "fastify": "^5.12.7"
+    "@fastify/cors": "^11.3.1",
+    "fastify": "^5.12.7",
+    "fractional-indexing": "^4.0.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.13"
   }
 }
