@@ -1,0 +1,9 @@
+# Scripts that run on Linux keep LF endings, even when checked out on Windows.
+*.sh            text eol=lf
+vps/asanaka     text eol=lf
+vps/*.template  text eol=lf
+vps/*.yml       text eol=lf
+vps/Dockerfile* text eol=lf
+.githooks/*     text eol=lf
+*.woff2 binary
+*.jpg   binary

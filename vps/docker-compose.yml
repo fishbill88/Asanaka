@@ -1,0 +1,52 @@
+# Asanaka on the VPS: its own Postgres (never the host's or another project's), its own network and
+# volume, and the API published on 127.0.0.1 only; the host's Caddy is the one public front door.
+#
+#   ~/asanaka/docker-compose.yml   this file
+#   ~/asanaka/.env                 secrets, made on the box, mode 600: POSTGRES_PASSWORD, ASANAKA_HOST_PORT
+#   ~/asanaka/current/             the staged release the api image builds from
+name: asanaka
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: asanaka
+      POSTGRES_USER: asanaka
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=30"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asanaka -d asanaka"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    cpus: 0.5
+    networks: [asanaka]
+
+  api:
+    build:
+      context: ./current
+      dockerfile: vps/Dockerfile.api
+    image: asanaka-api:current
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://asanaka:${POSTGRES_PASSWORD}@db:5432/asanaka
+      ASANAKA_API_PORT: "7360"
+      ASANAKA_TRUST_PROXY: "1"
+      ASANAKA_ALLOWED_ORIGINS: ${ASANAKA_ALLOWED_ORIGINS:-https://fishbill88.github.io}
+    ports:
+      - "127.0.0.1:${ASANAKA_HOST_PORT:-7360}:7360"
+    mem_limit: 256m
+    cpus: 0.5
+    networks: [asanaka]
+
+volumes:
+  pgdata:
+
+networks:
+  asanaka:

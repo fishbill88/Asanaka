@@ -1,0 +1,20 @@
+# Asanaka API, imported by /etc/caddy/Caddyfile. Rendered from vps/asanaka.caddy.template at deploy time
+# with the host name and port from .local/deploy.local.json; installed once by host-setup.sh.
+{{API_HOST}} {
+	handle /api/* {
+		request_body {
+			max_size 1MB
+		}
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:{{API_PORT}} {
+			flush_interval -1
+		}
+	}
+	handle /healthz {
+		reverse_proxy 127.0.0.1:{{API_PORT}}
+	}
+	handle {
+		respond "Asanaka API" 404
+	}
+	header -Server
+}

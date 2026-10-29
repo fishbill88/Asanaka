@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Asanaka on this box. From your PC:  ssh <host> ~/asanaka/asanaka <command>
+#
+#   status                    containers, health, last backups
+#   logs [api|db]             follow a log (Ctrl-C to stop)
+#   psql                      SQL shell on the Asanaka database
+#   admin <args...>           account tool: list | disable <name> | enable <name> | sign-out <name>
+#   set-user                  create or update an account; JSON {"username","password",...} on stdin
+#   admin-password --rotate   new admin password: signs admin out everywhere, stored here (600), printed once
+#   admin-password --show     print the current admin password
+#   smoke                     end-to-end check against the running API, as admin
+#   backup                    dump the database now (also nightly)
+#   restart [api|db]          restart a container
+set -euo pipefail
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+cd "$ROOT"
+PORT="$(grep -E '^ASANAKA_HOST_PORT=' .env 2>/dev/null | cut -d= -f2 || true)"
+PORT="${PORT:-7360}"
+cmd="${1:-status}"; shift || true
+
+case "$cmd" in
+  status)
+    docker compose ps
+    echo
+    if curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null; then echo "api healthy on 127.0.0.1:$PORT"; else echo "api NOT answering on 127.0.0.1:$PORT"; fi
+    ls -1t backups/*.dump 2>/dev/null | head -3 | sed 's/^/backup: /' || true ;;
+  logs)    docker compose logs -f --tail 100 "${1:-api}" ;;
+  psql)    docker compose exec db psql -U asanaka -d asanaka ;;
+  admin)   docker compose exec -T api node tools/admin.mjs "$@" ;;
+  set-user) docker compose exec -T api node tools/admin.mjs set-user ;;
+  admin-password)
+    case "${1:-}" in
+      --rotate)
+        new="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 20)"
+        printf '%s' "$new" | docker compose exec -T api node tools/admin.mjs set-password admin >/dev/null
+        ( umask 077; printf '%s\n' "$new" > .admin-password )
+        echo "rotated; admin is signed out everywhere. New admin password:"
+        cat .admin-password ;;
+      --show)
+        [ -f .admin-password ] || { echo "no admin password yet: run admin-password --rotate" >&2; exit 1; }
+        cat .admin-password ;;
+      *) echo "usage: admin-password --rotate | --show" >&2; exit 1 ;;
+    esac ;;
+  smoke)
+    [ -f .admin-password ] || { echo "no admin password yet" >&2; exit 1; }
+    printf '{"username":"admin","password":"%s"}' "$(cat .admin-password)" | docker compose exec -T api node tools/smoke.mjs http://127.0.0.1:7360 ;;
+  backup)  ./backup.sh --now ;;
+  restart) docker compose restart "${1:-api}" ;;
+  *)       sed -n '2,16p' "$0"; exit 1 ;;
+esac
