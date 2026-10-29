@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Asanaka Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: a reading column beside a sticky contents rail; previews, tables and the diagram run wider. */
+  --bg: #f5f5f1;
+  --surface: #ffffff;
+  --sunk: #ebebe5;
+  --ink: #17181a;
+  --muted: #55595e;
+  --line: #d6d6cf;
+  --accent: #0f6e66;
+  --accent-ink: #ffffff;
+  --ok: #1b7444;
+  --warn: #965406;
+  --risk: #b42318;
+  --font: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', Consolas, ui-monospace, monospace;
+  --step-small: 0.875rem;
+  --step-body: 1.0625rem;
+  --step-lead: 1.25rem;
+  --step-head: clamp(1.5rem, 1.1rem + 1.2vw, 2rem);
+  --step-title: clamp(2.25rem, 1.4rem + 3vw, 3.5rem);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111213; --surface: #1a1c1e; --sunk: #232629; --ink: #ecebe7; --muted: #a2a6ab; --line: #33373b;
+    --accent: #3fbfb1; --accent-ink: #08201d; --ok: #4fc984; --warn: #e3a24a; --risk: #f07c6e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111213; --surface: #1a1c1e; --sunk: #232629; --ink: #ecebe7; --muted: #a2a6ab; --line: #33373b;
+  --accent: #3fbfb1; --accent-ink: #08201d; --ok: #4fc984; --warn: #e3a24a; --risk: #f07c6e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: var(--step-body); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; text-wrap: balance; font-weight: 600; }
+p, ul, ol, dl, figure, pre { margin: 0; }
+a { color: var(--accent); text-underline-offset: 0.2em; }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--sunk); padding: 0.1em 0.35em; border-radius: 4px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.page { max-width: 1320px; margin: 0 auto; padding: 48px max(20px, env(safe-area-inset-right, 0px)) 96px max(20px, env(safe-area-inset-left, 0px)); display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; }
+
+/* Contents rail */
+.toc { position: sticky; top: 24px; align-self: start; display: grid; gap: 18px; font-size: var(--step-small); }
+.toc .mark { font-weight: 600; font-size: 1rem; }
+.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; transition: background-color 160ms ease, color 160ms ease; }
+.toc a:hover { color: var(--ink); background: var(--sunk); }
+.toc a.is-here { color: var(--ink); background: var(--surface); font-weight: 500; }
+.toc-progress { padding: 12px; border-radius: 10px; background: var(--surface); display: grid; gap: 8px; }
+.toc-progress strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 300ms var(--ease-out); }
+.theme { display: flex; gap: 4px; }
+.theme button { flex: 1; min-height: 32px; border: 0; border-radius: 6px; background: var(--sunk); color: var(--muted); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.theme button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+main { min-width: 0; display: grid; gap: 72px; }
+section { display: grid; gap: 20px; }
+section > h2 { font-size: var(--step-head); }
+.lede { font-size: var(--step-lead); max-width: 62ch; }
+.prose { max-width: 70ch; display: grid; gap: 12px; }
+.note { font-size: var(--step-small); color: var(--muted); max-width: 70ch; }
+
+/* Title block */
+.title { display: grid; gap: 20px; }
+.title h1 { font-size: var(--step-title); letter-spacing: -0.02em; }
+.title .name { color: var(--muted); font-size: var(--step-small); }
+.status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.status div { padding: 14px 16px; border-radius: 10px; background: var(--surface); display: grid; gap: 4px; }
+.status dt { font-size: var(--step-small); color: var(--muted); }
+.status dd { margin: 0; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--muted); }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.wait { background: var(--accent); }
+
+/* Design previews: each frame holds the real page at 1440 x 900, scaled to fit. */
+.designs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.design { background: var(--surface); border-radius: 12px; overflow: hidden; display: grid; grid-template-rows: auto 1fr; outline: 2px solid transparent; transition: outline-color 160ms ease; }
+.design.is-picked { outline-color: var(--accent); }
+.shot { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--sunk); }
+.shot iframe { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; border: 0; transform-origin: 0 0; transform: scale(var(--s, 0.28)); pointer-events: none; }
+.shot a { position: absolute; inset: 0; }
+.shot a span { position: absolute; right: 10px; bottom: 10px; padding: 6px 10px; border-radius: 6px; background: var(--ink); color: var(--bg); font-size: 0.8125rem; font-weight: 500; opacity: 0; transform: translateY(4px); transition: opacity 160ms ease, transform 160ms var(--ease-out); }
+.shot a:hover span, .shot a:focus-visible span { opacity: 1; transform: none; }
+.design-body { padding: 16px 18px 18px; display: grid; gap: 10px; align-content: start; }
+.design-body h3 { font-size: 1.125rem; display: flex; align-items: baseline; gap: 8px; }
+.design-body h3 small { font-size: var(--step-small); font-weight: 400; color: var(--muted); }
+.design-body p { font-size: 0.9375rem; }
+.swatches { display: flex; gap: 4px; }
+.swatches i { width: 22px; height: 22px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, 0.25); }
+.try { font-size: 0.875rem; color: var(--muted); }
+.design-links { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 0.875rem; font-weight: 500; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border-radius: 10px; background: var(--surface); }
+table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+th { font-size: var(--step-small); font-weight: 500; color: var(--muted); background: var(--surface); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 500; white-space: nowrap; }
+
+/* Scope columns */
+.scope { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+.scope > div { background: var(--surface); border-radius: 10px; padding: 18px; display: grid; gap: 10px; align-content: start; }
+.scope h3 { font-size: 1rem; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.scope h3 span { font-size: var(--step-small); font-weight: 400; color: var(--muted); }
+.scope ul { padding-left: 1.1em; display: grid; gap: 6px; font-size: 0.9375rem; }
+
+/* Diagram */
+.diagram { background: var(--surface); border-radius: 12px; padding: 16px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 760px; height: auto; font-family: var(--font); }
+.d-box { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+.d-box.is-key { stroke: var(--accent); stroke-width: 2; }
+.d-t { fill: var(--ink); font-size: 15px; font-weight: 600; }
+.d-s { fill: var(--muted); font-size: 12.5px; }
+.d-l { fill: var(--accent); font-size: 12.5px; font-weight: 500; }
+.d-a { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.d-head { fill: var(--muted); }
+
+/* Two-up blocks */
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card { background: var(--surface); border-radius: 10px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
+.card h3 { font-size: 1rem; }
+.card ol, .card ul { padding-left: 1.2em; display: grid; gap: 6px; font-size: 0.9375rem; }
+.callout { border-left: 4px solid var(--warn); background: var(--surface); border-radius: 0 10px 10px 0; padding: 14px 18px; font-size: 0.9375rem; max-width: 76ch; }
+.callout strong { color: var(--warn); }
+
+pre { background: var(--surface); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 0.8125rem; line-height: 1.55; }
+pre .c { color: var(--muted); }
+
+/* Phases */
+.phases { list-style: none; padding: 0; display: grid; gap: 8px; counter-reset: ph -1; }
+.phases li { counter-increment: ph; background: var(--surface); border-radius: 10px; padding: 14px 18px 14px 64px; position: relative; display: grid; gap: 4px; }
+.phases li::before { content: counter(ph); position: absolute; left: 18px; top: 14px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); font-weight: 600; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.phases li.is-now::before { background: var(--accent); color: var(--accent-ink); }
+.phases h3 { font-size: 1rem; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.phases h3 span { font-size: var(--step-small); font-weight: 500; color: var(--accent); }
+.phases p { font-size: 0.9375rem; color: var(--muted); }
+.phases p b { color: var(--ink); font-weight: 500; }
+
+/* Questions */
+.qs { display: grid; gap: 12px; }
+.q { background: var(--surface); border-radius: 12px; padding: 18px 20px; border: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.q legend { float: left; width: 100%; padding: 0; font-weight: 600; font-size: 1rem; display: flex; gap: 10px; align-items: baseline; }
+.q legend span { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.q .why { font-size: 0.9375rem; color: var(--muted); clear: both; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt { position: relative; }
+.opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.opt span { display: block; padding: 8px 14px; border-radius: 8px; background: var(--sunk); font-size: 0.9375rem; transition: background-color 140ms ease, color 140ms ease; }
+.opt input:checked + span { background: var(--ink); color: var(--bg); }
+.opt input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
+.opt:hover span { background: var(--line); }
+.opt input:checked:hover + span { background: var(--ink); }
+.q input[type="text"], .q textarea { width: 100%; max-width: 520px; min-height: 42px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-size: 0.9375rem; }
+.q textarea { min-height: 72px; resize: vertical; }
+.copy-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { min-height: 46px; padding: 0 20px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 600; cursor: pointer; transition: transform 140ms var(--ease-out), filter 160ms ease; }
+.btn:active { transform: scale(0.97); }
+.btn:hover { filter: brightness(1.08); }
+.btn-quiet { background: var(--sunk); color: var(--ink); }
+.copied { font-size: 0.9375rem; color: var(--ok); font-weight: 500; }
+#answers-text { width: 100%; min-height: 200px; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-family: var(--mono); font-size: 0.8125rem; line-height: 1.6; }
+
+.risks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.risk { background: var(--surface); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; font-size: 0.9375rem; }
+.risk h3 { font-size: 1rem; }
+footer.end { color: var(--muted); font-size: var(--step-small); }
+
+@media (max-width: 1100px) {
+  .designs { grid-template-columns: 1fr; }
+  .design { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-rows: none; }
+}
+@media (max-width: 900px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 28px; }
+  .toc { position: static; }
+  .toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scope, .pair, .risks { grid-template-columns: 1fr; }
+  .design { grid-template-columns: 1fr; }
+  main { gap: 56px; }
+}
+@media (max-width: 480px) {
+  .status { grid-template-columns: 1fr; }
+  .toc ol { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <aside class="toc" aria-label="Contents">
+    <span class="mark">Asanaka plan</span>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#designs">Pick a design</a></li>
+      <li><a href="#decisions">Decisions</a></li>
+      <li><a href="#scope">What gets built</a></li>
+      <li><a href="#architecture">How it connects</a></li>
+      <li><a href="#accounts">Accounts</a></li>
+      <li><a href="#secrets">Where secrets live</a></li>
+      <li><a href="#vps">VPS and deploys</a></li>
+      <li><a href="#data">Data and API</a></li>
+      <li><a href="#phases">Phases</a></li>
+      <li><a href="#answers">Your answers</a></li>
+      <li><a href="#risks">Risks</a></li>
+    </ol>
+    <div class="toc-progress" aria-live="polite">
+      <span>Questions answered</span>
+      <strong id="progress-count">0 of 6</strong>
+      <div class="bar"><i id="progress-bar"></i></div>
+    </div>
+    <div class="theme" role="group" aria-label="Theme">
+      <button type="button" data-theme-set="" aria-pressed="true">System</button>
+      <button type="button" data-theme-set="light" aria-pressed="false">Light</button>
+      <button type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+    </div>
+  </aside>
+
+  <main>
+    <section class="title" id="overview" aria-labelledby="title">
+      <p class="name">Asa na ka? is Cebuano for “where are you now?”</p>
+      <h1 id="title">Asanaka build plan</h1>
+      <p class="lede">A kanban board modelled on Asana’s Board view. The site will live on GitHub Pages, and the API and its own database will run in Docker on the VPS. Nothing has been built, committed or deployed yet. Use this page to check the plan, pick a design and answer six questions.</p>
+      <dl class="status">
+        <div><dt>Plan</dt><dd><span class="dot wait"></span>Ready for review</dd></div>
+        <div><dt>Design</dt><dd><span class="dot ok"></span>B (Pin) chosen</dd></div>
+        <div><dt>VPS</dt><dd><span class="dot ok"></span>Surveyed, not changed</dd></div>
+        <div><dt>GitHub repo</dt><dd><span class="dot warn"></span>Nothing committed yet</dd></div>
+      </dl>
+    </section>
+
+    <section id="designs" aria-labelledby="designs-title">
+      <h2 id="designs-title">Pick a design</h2>
+      <p class="prose">Each is a working prototype: a landing page, a sign-in page and the board. Sign in with any username and password. On the board you can drag cards, add tasks and sections, filter, open a task and tick it to see that design’s celebration. Click a preview to open the full page.</p>
+      <div class="designs">
+        <article class="design" data-design="A">
+          <div class="shot"><iframe src="designs/a-chapters.html" title="Design A preview" loading="lazy" tabindex="-1" aria-hidden="true"></iframe><a href="designs/a-chapters.html" target="_blank" rel="noopener" aria-label="Open design A, Chapters, full page"><span>Open full page</span></a></div>
+          <div class="design-body">
+            <h3>A · Chapters <small>General Sans</small></h3>
+            <div class="swatches" aria-hidden="true"><i style="background:#d71e1e"></i><i style="background:#1e4bd7"></i><i style="background:#ffe927"></i><i style="background:#0c7866"></i><i style="background:#191919"></i></div>
+            <p>Bold flat colours on charcoal. Each board section is a full-screen colour field, and one card slides through all four as you scroll.</p>
+            <p class="try">Try: type a task into “Where’s … ?”, scroll the four colours, build a card in “Make a card yourself”.</p>
+            <div class="design-links"><a href="designs/a-chapters.html" target="_blank" rel="noopener">Landing page</a><a href="designs/a-chapters.html#signin" target="_blank" rel="noopener">Sign-in page</a></div>
+          </div>
+        </article>
+        <article class="design" data-design="B">
+          <div class="shot"><iframe src="designs/b-pin.html" title="Design B preview" loading="lazy" tabindex="-1" aria-hidden="true"></iframe><a href="designs/b-pin.html" target="_blank" rel="noopener" aria-label="Open design B, Pin, full page"><span>Open full page</span></a></div>
+          <div class="design-body">
+            <h3>B · Pin <small>Roundo</small></h3>
+            <div class="swatches" aria-hidden="true"><i style="background:#cbe4f2"></i><i style="background:#f1e3b5"></i><i style="background:#ffc013"></i><i style="background:#b0298f"></i><i style="background:#0a0a0a"></i></div>
+            <p>Soft sky blue and magenta, everything round. The round check you tap is the “you are here” dot. The hero holds a live board you can drag on.</p>
+            <p class="try">Try: drag a card on the magenta circle, switch Where / Who / When, scroll “How a card moves”.</p>
+            <div class="design-links"><a href="designs/b-pin.html" target="_blank" rel="noopener">Landing page</a><a href="designs/b-pin.html#signin" target="_blank" rel="noopener">Sign-in page</a></div>
+          </div>
+        </article>
+        <article class="design" data-design="C">
+          <div class="shot"><iframe src="designs/c-departures.html" title="Design C preview" loading="lazy" tabindex="-1" aria-hidden="true"></iframe><a href="designs/c-departures.html" target="_blank" rel="noopener" aria-label="Open design C, Departures, full page"><span>Open full page</span></a></div>
+          <div class="design-body">
+            <h3>C · Departures <small>Hanken Grotesk</small></h3>
+            <div class="swatches" aria-hidden="true"><i style="background:#e1ac10"></i><i style="background:#0b0b0b"></i><i style="background:#f5e8c4"></i><i style="background:#24338f"></i></div>
+            <p>Mustard and black. “Asa na ka?” fills one line with a Cebu jeepney’s route inside it, and tasks show on a flip-letter departures board.</p>
+            <p class="try">Try: press a status on the departures board, sign in with the sentence form, tick a task to see “Nahuman na.”</p>
+            <div class="design-links"><a href="designs/c-departures.html" target="_blank" rel="noopener">Landing page</a><a href="designs/c-departures.html#signin" target="_blank" rel="noopener">Sign-in page</a></div>
+          </div>
+        </article>
+      </div>
+      <p class="note">The previews need an internet connection for the animation library and design C’s font. Photos are openly licensed from Wikimedia Commons and credited on each page.</p>
+    </section>
+
+    <section id="decisions" aria-labelledby="decisions-title">
+      <h2 id="decisions-title">Decisions</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Area</th><th scope="col">Choice</th><th scope="col">Why</th></tr></thead>
+          <tbody>
+            <tr><td>Website</td><td>Vite + React 19 + TypeScript, built to static files</td><td>GitHub Pages only serves static files</td></tr>
+            <tr><td>Drag and drop</td><td>dnd-kit: mouse, touch (long press) and keyboard</td><td>Accessible; handles moving cards between columns and scrolling while dragging</td></tr>
+            <tr><td>Motion</td><td>Motion for the board; GSAP only on the landing page</td><td>Cards must reflow smoothly; the landing page gets the flashy scroll work</td></tr>
+            <tr><td>Server data</td><td>TanStack Query with optimistic updates</td><td>A drag shows instantly and rolls back if the server refuses it</td></tr>
+            <tr><td>API</td><td>Node 22 + Fastify + <code>pg</code></td><td>Same runtime as the other services on the box; checks every request’s shape</td></tr>
+            <tr><td>Database</td><td>Postgres 16 in its own container</td><td>Kept apart from every other service on the VPS</td></tr>
+            <tr><td>Local testing</td><td>PGlite (Postgres compiled to WebAssembly)</td><td>This PC has no Docker; tests still run real Postgres</td></tr>
+            <tr><td>Card order</td><td>Sortable text keys on sections and tasks</td><td>A drag rewrites one row, never the whole column</td></tr>
+            <tr><td>Sign-in</td><td>Username + password, scrypt hashes, 12-hour tokens</td><td>Cookies won’t cross from github.io to the API address; tokens will</td></tr>
+            <tr><td>Wrong passwords</td><td>5 tries per address and username, then a 15-minute lock</td><td>The sign-in page is public</td></tr>
+            <tr><td>Live updates</td><td>Server-sent events per project (phase 6)</td><td>One-way updates are enough and pass through the web server unchanged</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">We copy Asana’s board interactions, not its name, logo or artwork.</p>
+    </section>
+
+    <section id="scope" aria-labelledby="scope-title">
+      <h2 id="scope-title">What gets built</h2>
+      <div class="scope">
+        <div>
+          <h3>Version 1 <span>the board works end to end</span></h3>
+          <ul>
+            <li>Sidebar with projects, your name and Sign out.</li>
+            <li>Project header: name, member avatars, filters (all, my tasks, due this week), Add task.</li>
+            <li>Sections as columns: rename, task count, add a task at the top, menu (rename, move, delete), Add section, drag to reorder sections.</li>
+            <li>Cards: check circle, title, assignee, due date (red when late), priority and status chips, subtask and comment counts.</li>
+            <li>Drag cards within and across sections; the other cards make room; the board scrolls near the edges; keyboard and touch work too.</li>
+            <li>Inline “Add task” at the bottom of each section that stays open for the next one.</li>
+            <li>Task pane from the right with its own link: title, complete, assignee, due date, section, priority, status, description, subtasks, comments.</li>
+            <li>Completing a task: the check fills, a short celebration plays, the card settles in Done. Unticking puts it back where it was.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Version 1.1 <span>phases 6–7</span></h3>
+          <ul>
+            <li>Live updates between people</li>
+            <li>Sort</li>
+            <li>Likes</li>
+            <li>Activity feed on each task</li>
+            <li>Admin page for users</li>
+            <li>Dragging several cards at once</li>
+            <li>Asana’s keyboard shortcuts</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Later</h3>
+          <ul>
+            <li>List, timeline and calendar views</li>
+            <li>Attachments</li>
+            <li>Custom fields</li>
+            <li>Notifications</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" aria-labelledby="arch-title">
+      <h2 id="arch-title">How the pieces connect</h2>
+      <figure class="diagram">
+        <svg viewBox="0 0 960 320" role="img" aria-labelledby="arch-desc">
+          <desc id="arch-desc">The browser loads the site from GitHub Pages and calls the API over HTTPS with a sign-in token. Caddy on the VPS passes requests to the API container on a private port; the API talks to its own Postgres container. Deploys go from this PC to the VPS over SSH.</desc>
+          <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+          <rect class="d-box" x="20" y="20" width="200" height="70" rx="10"/>
+          <text class="d-t" x="36" y="50">GitHub Pages</text>
+          <text class="d-s" x="36" y="72">fishbill88.github.io/Asanaka</text>
+          <path class="d-a" d="M120 90V128" marker-end="url(#ah)"/>
+          <text class="d-l" x="130" y="114">site files</text>
+
+          <rect class="d-box is-key" x="20" y="132" width="200" height="80" rx="10"/>
+          <text class="d-t" x="36" y="164">Your browser</text>
+          <text class="d-s" x="36" y="186">landing, sign-in, board</text>
+
+          <path class="d-a" d="M220 172H272" marker-end="url(#ah)"/>
+          <text class="d-l" x="222" y="160">HTTPS + token</text>
+
+          <rect class="d-box" x="276" y="132" width="196" height="80" rx="10"/>
+          <text class="d-t" x="292" y="164">Caddy on the VPS</text>
+          <text class="d-s" x="292" y="186">its own address, TLS</text>
+
+          <path class="d-a" d="M472 172H524" marker-end="url(#ah)"/>
+          <text class="d-l" x="474" y="160">local only</text>
+
+          <rect class="d-box is-key" x="528" y="132" width="196" height="80" rx="10"/>
+          <text class="d-t" x="544" y="164">API container</text>
+          <text class="d-s" x="544" y="186">Fastify, Node 22</text>
+
+          <path class="d-a" d="M724 172H776" marker-end="url(#ah)"/>
+          <text class="d-l" x="726" y="160">private</text>
+
+          <rect class="d-box is-key" x="780" y="132" width="160" height="80" rx="10"/>
+          <text class="d-t" x="796" y="164">Database</text>
+          <text class="d-s" x="796" y="186">Postgres 16</text>
+
+          <rect class="d-box" x="528" y="244" width="196" height="64" rx="10"/>
+          <text class="d-t" x="544" y="272">This PC</text>
+          <text class="d-s" x="544" y="292">secrets stay here</text>
+          <path class="d-a" d="M626 244V216" marker-end="url(#ah)"/>
+          <text class="d-l" x="636" y="234">deploy over SSH</text>
+        </svg>
+      </figure>
+      <p class="prose">The API only answers requests from <code>https://fishbill88.github.io</code>. The API address is put into the website at build time from a GitHub setting, not from the code. It ends up visible in the browser anyway, because the browser has to call it, but it isn’t a password.</p>
+    </section>
+
+    <section id="accounts" aria-labelledby="accounts-title">
+      <h2 id="accounts-title">Accounts and passwords</h2>
+      <div class="pair">
+        <div class="card">
+          <h3><code>admin</code>: a password that rotates</h3>
+          <ol>
+            <li>The password is 20 random characters, made on the VPS. It is never in the repo or on this PC’s disk.</li>
+            <li>Rotating it updates the hash in the database and signs every admin session out at once. No restart needed.</li>
+            <li>It rotates only when you ask. There is no schedule.</li>
+            <li><code>rotate-admin-password.bat</code> rotates it now and shows the new one; <code>-Show</code> shows the current one.</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3><code>ameerperalta</code>: your password, kept local</h3>
+          <ol>
+            <li>The password sits in <code>.secrets/users.local.json</code>, which git ignores.</li>
+            <li><code>seed-users.ps1</code> sends it to the server privately (on stdin), so it never shows in the repo, a command line or shell history.</li>
+            <li>That also avoids a trap in this password: <code>$$</code> turns into a process number in a shell, and into a single <code>$</code> in a Docker settings file.</li>
+          </ol>
+        </div>
+      </div>
+      <p class="callout"><strong>Worth knowing:</strong> the password you gave is short and common. The lock after 5 wrong tries protects it, but it should be changed after the first sign-in. The admin page in phase 7 can do that.</p>
+      <p class="note">“Don’t mind the login for now” is read as: a simple sign-in page, but no sign-up, password reset or single sign-on.</p>
+    </section>
+
+    <section id="secrets" aria-labelledby="secrets-title">
+      <h2 id="secrets-title">Where secrets live</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Secret</th><th scope="col">Lives only in</th><th scope="col">Never in</th></tr></thead>
+          <tbody>
+            <tr><td>SSH key, VPS address, server account</td><td><code>~/.ssh/</code> on this PC</td><td>the repo</td></tr>
+            <tr><td>VPS notes (ports, sudo rules, other services)</td><td><code>.local/VPS.md</code>, ignored by git</td><td>the repo</td></tr>
+            <tr><td>Database password</td><td>a <code>.env</code> file on the VPS, made there, readable only by its owner</td><td>anywhere else</td></tr>
+            <tr><td>admin password</td><td>VPS: a private file and a hash in the database</td><td>the repo, this PC</td></tr>
+            <tr><td>ameerperalta password</td><td><code>.secrets/users.local.json</code> here, and a hash in the database</td><td>the repo, the VPS’s disk in plain text</td></tr>
+            <tr><td>API address</td><td>a GitHub Actions setting</td><td>the code (it shows in the built site by design)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="prose">Three guards: the <code>.gitignore</code>, a check before every commit that refuses those files and anything shaped like a password, and an automatic secret scan on GitHub as a backstop.</p>
+    </section>
+
+    <section id="vps" aria-labelledby="vps-title">
+      <h2 id="vps-title">VPS and deploys</h2>
+      <div class="pair">
+        <div class="card">
+          <h3>What I found on the VPS</h3>
+          <ul>
+            <li>The server account can’t create folders in <code>/opt</code>, so Asanaka goes in its home folder.</li>
+            <li>Plenty of room: about 22 GB of free memory, 4 cores, 159 GB of disk.</li>
+            <li>Asanaka gets its own Docker project, its own database, a private port, and limits (API 0.5 CPU / 256 MB, database 512 MB). The other services are left alone.</li>
+            <li>Nightly database backup, 14 kept.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>The one step you run yourself</h3>
+          <ul>
+            <li>Giving the API its web address needs the server account’s sudo password, so you run <code>vps\host-setup.bat</code> once and type it.</li>
+            <li>It restarts the web server, which drops <b>every</b> site on the box for about a second. Question 4 picks the time.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="pair">
+        <div class="card">
+          <h3>Website deploys</h3>
+          <p>Push to <code>main</code>, and GitHub builds the site and publishes it to the GitHub link.</p>
+        </div>
+        <div class="card">
+          <h3>API deploys</h3>
+          <p><code>deploy-vps.bat</code> copies the API to the VPS, rebuilds it, waits for its health check and keeps the last five releases. The database is never rebuilt. A smoke test then signs in, adds, moves, completes and deletes a task.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="data" aria-labelledby="data-title">
+      <h2 id="data-title">Data and API</h2>
+      <pre><span class="c">-- one row per table, the main columns</span>
+users      id, username, display_name, password_hash, role (admin | member), disabled
+sessions   id, user_id, token_hash, expires_at, ip
+projects   id, name, color, position, archived_at
+sections   id, project_id, name, position
+tasks      id, project_id, section_id, parent_id (subtask), title, notes, assignee_id, due_on,
+           priority (low | medium | high), status (on track | at risk | off track),
+           completed_at, previous_section_id, position, deleted_at
+comments   id, task_id, author_id, body, created_at
+task_likes task_id, user_id
+activity   id, project_id, task_id, actor_id, kind, data, created_at
+login_failures  ip, username, failures, locked_until</pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Request</th><th scope="col">Does</th></tr></thead>
+          <tbody>
+            <tr><td><code>POST /auth/login</code></td><td>Signs in and returns a token; counts wrong passwords</td></tr>
+            <tr><td><code>GET /projects/:id/board</code></td><td>The whole board: project, sections and cards with their counts</td></tr>
+            <tr><td><code>POST /sections/:id/tasks</code></td><td>Adds a task at the top or bottom of a section</td></tr>
+            <tr><td><code>PATCH /tasks/:id</code></td><td>Changes any field, including a drag (new section and position) and completing</td></tr>
+            <tr><td><code>GET /tasks/:id</code></td><td>One task with subtasks, comments and activity</td></tr>
+            <tr><td><code>POST /tasks/:id/comments</code></td><td>Adds a comment</td></tr>
+            <tr><td><code>GET /projects/:id/events</code></td><td>Live changes from other people (phase 6)</td></tr>
+            <tr><td><code>GET /healthz</code></td><td>Says the API is up, for Docker and the deploy script</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">The full list of requests is in <code>PLAN.md</code>, section 6.</p>
+    </section>
+
+    <section id="phases" aria-labelledby="phases-title">
+      <h2 id="phases-title">Phases</h2>
+      <ol class="phases">
+        <li><h3>Plan and three designs <span>done</span></h3><p><b>Done:</b> design B picked and the questions answered on 29 October 2026.</p></li>
+        <li class="is-now"><h3>Set up the repo <span>next</span></h3><p><b>Done when</b> GitHub Pages serves an empty app at the link, and committing a fake secret file is refused.</p></li>
+        <li><h3>API and database, tested on this PC</h3><p><b>Done when</b> tests pass for sign-in, the wrong-password lock, loading a board, moving cards in order, and completing and unticking.</p></li>
+        <li><h3>VPS: database, API, web address, accounts, backups</h3><p><b>Done when</b> the smoke test passes against the live API, and rotating the admin password makes the old one stop working.</p></li>
+        <li><h3>The board</h3><p><b>Done when</b> every version 1 item works against the live API.</p></li>
+        <li><h3>Landing and sign-in in your chosen design, live on GitHub</h3><p><b>Done when</b> signing in at the GitHub link as <code>ameerperalta</code> opens the board.</p></li>
+        <li><h3>Live updates, sort, likes, activity</h3><p><b>Done when</b> two browsers see each other’s moves within a second.</p></li>
+        <li><h3>Admin page, accessibility, phones, reduced motion</h3><p><b>Done when</b> dragging works with the keyboard alone, the phone layout works, and admin can reset a password.</p></li>
+      </ol>
+    </section>
+
+    <section id="answers" aria-labelledby="answers-title">
+      <h2 id="answers-title">Your answers</h2>
+      <p class="prose">Answer what you can, then press “Copy my answers” and paste the result into the chat. Your choices are remembered in this browser.</p>
+      <form class="qs" id="qs">
+        <fieldset class="q" data-q="design">
+          <legend><span>1</span>Which design?</legend>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="design" value="A (Chapters)"><span>A · Chapters</span></label>
+            <label class="opt"><input type="radio" name="design" value="B (Pin)"><span>B · Pin</span></label>
+            <label class="opt"><input type="radio" name="design" value="C (Departures)"><span>C · Departures</span></label>
+            <label class="opt"><input type="radio" name="design" value="A mix"><span>A mix</span></label>
+          </div>
+          <label class="why" for="design-mix" id="design-mix-label" hidden>What to take from each</label>
+          <textarea id="design-mix" name="design-mix" hidden placeholder="For example: B’s board with C’s sign-in sentence"></textarea>
+        </fieldset>
+        <fieldset class="q" data-q="rotation">
+          <legend><span>2</span>How often should the admin password rotate?</legend>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="rotation" value="weekly"><span>Weekly (planned)</span></label>
+            <label class="opt"><input type="radio" name="rotation" value="daily"><span>Daily</span></label>
+            <label class="opt"><input type="radio" name="rotation" value="only when I ask"><span>Only when I ask</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="q" data-q="name">
+          <legend><span>3</span>Display name for <code>ameerperalta</code></legend>
+          <p class="why">Shown on cards, comments and the sidebar.</p>
+          <input type="text" id="display-name" name="display-name" value="Ameer Peralta" autocomplete="off" aria-label="Display name">
+          <div class="opts"><label class="opt"><input type="checkbox" name="name-ok" value="yes"><span>This is right</span></label></div>
+        </fieldset>
+        <fieldset class="q" data-q="restart">
+          <legend><span>4</span>When can the web server restart (about one second, every site on the VPS)?</legend>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="restart" value="any time"><span>Any time</span></label>
+            <label class="opt"><input type="radio" name="restart" value="at a set time"><span>At a set time</span></label>
+          </div>
+          <input type="text" id="restart-time" name="restart-time" hidden placeholder="For example: after 22:00 Manila time" aria-label="When to restart">
+        </fieldset>
+        <fieldset class="q" data-q="cebuano">
+          <legend><span>5</span>Design C shows “Nahuman na.” for “it’s finished”. Is that right?</legend>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="cebuano" value="correct"><span>Correct</span></label>
+            <label class="opt"><input type="radio" name="cebuano" value="use another phrase"><span>Use another phrase</span></label>
+          </div>
+          <input type="text" id="cebuano-other" name="cebuano-other" hidden placeholder="The phrase to use" aria-label="Phrase to use instead">
+        </fieldset>
+        <fieldset class="q" data-q="commit">
+          <legend><span>6</span>Commit the plan and designs to <code>main</code> now?</legend>
+          <p class="why">Only <code>PLAN.md</code>, this page, <code>.gitignore</code> and <code>designs/</code>. The local VPS notes stay out.</p>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="commit" value="yes, commit and push"><span>Yes, commit and push</span></label>
+            <label class="opt"><input type="radio" name="commit" value="not yet"><span>Not yet</span></label>
+          </div>
+        </fieldset>
+        <div class="copy-row">
+          <button type="button" class="btn" id="copy">Copy my answers</button>
+          <button type="button" class="btn btn-quiet" id="reset">Clear answers</button>
+          <span class="copied" id="copied" role="status"></span>
+        </div>
+        <label for="answers-text" class="note">Your answers as text</label>
+        <textarea id="answers-text" readonly></textarea>
+      </form>
+    </section>
+
+    <section id="risks" aria-labelledby="risks-title">
+      <h2 id="risks-title">Risks</h2>
+      <div class="risks">
+        <div class="risk"><h3>A shared VPS</h3><p>A runaway container could starve the other services. The memory and CPU limits stop that.</p></div>
+        <div class="risk"><h3>The API’s web address</h3><p>It comes from sslip.io, a free service that turns an IP address into a name. If it disappears, the API needs a real domain: one web server line and one GitHub setting.</p></div>
+        <div class="risk"><h3>Sign-in tokens in the browser</h3><p>Any script running on the page could read them. A strict content policy and no third-party scripts on the app keep that risk small.</p></div>
+        <div class="risk"><h3>A weak user password on a public page</h3><p>Locked after 5 wrong tries for 15 minutes. Change it after the first sign-in.</p></div>
+      </div>
+    </section>
+
+    <footer class="end">Written from <code>PLAN.md</code> on 29 October 2026. The previews load the prototypes in <code>designs/</code>.</footer>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage may be blocked */ } },
+  };
+
+  // Theme: system, light or dark, remembered in this browser.
+  function setTheme(t) {
+    if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+    $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === (t || ''))));
+    store.set('asanaka-plan-theme', t || '');
+  }
+  $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+  setTheme(store.get('asanaka-plan-theme') || '');
+
+  // Previews: each frame shows the real page at 1440 x 900, scaled to the card.
+  const fit = (shot) => shot.style.setProperty('--s', String(shot.clientWidth / 1440));
+  const ro = new ResizeObserver((entries) => entries.forEach((e) => fit(e.target)));
+  $$('.shot').forEach((s) => { fit(s); ro.observe(s); });
+
+  // Contents: mark the section being read.
+  const links = new Map($$('.toc a').map((a) => [a.getAttribute('href').slice(1), a]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      links.forEach((a) => a.classList.remove('is-here'));
+      links.get(e.target.id)?.classList.add('is-here');
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  $$('main > section').forEach((s) => io.observe(s));
+
+  // Questions: remember choices, show follow-up fields, count answers, write them out as text.
+  const form = $('#qs');
+  const saved = store.get('asanaka-plan-answers') || {};
+  for (const [k, v] of Object.entries(saved)) {
+    const els = $$(`[name="${CSS.escape(k)}"]`, form);
+    els.forEach((el) => {
+      if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === v;
+      else el.value = v;
+    });
+  }
+  const val = (name) => { const els = $$(`[name="${name}"]`, form); const c = els.find((e) => (e.type === 'radio' || e.type === 'checkbox') ? e.checked : false); return c ? c.value : (els[0] && els[0].type !== 'radio' && els[0].type !== 'checkbox' ? els[0].value.trim() : ''); };
+  function update() {
+    const mix = val('design') === 'A mix';
+    $('#design-mix').hidden = !mix;
+    $('#design-mix-label').hidden = !mix;
+    $('#restart-time').hidden = val('restart') !== 'at a set time';
+    $('#cebuano-other').hidden = val('cebuano') !== 'use another phrase';
+    $$('.design').forEach((d) => d.classList.toggle('is-picked', val('design').startsWith(d.dataset.design + ' ')));
+
+    const answered = [
+      !!val('design'),
+      !!val('rotation'),
+      !!val('name-ok') || (val('display-name') && val('display-name') !== 'Ameer Peralta'),
+      !!val('restart'),
+      !!val('cebuano'),
+      !!val('commit'),
+    ].filter(Boolean).length;
+    $('#progress-count').textContent = `${answered} of 6`;
+    $('#progress-bar').style.width = (answered / 6) * 100 + '%';
+
+    const lines = [
+      'Asanaka plan answers',
+      `1. Design: ${val('design') || 'not answered'}${mix && val('design-mix') ? ' — ' + val('design-mix') : ''}`,
+      `2. Admin password rotation: ${val('rotation') || 'not answered'}`,
+      `3. Display name for ameerperalta: ${val('display-name') || 'not answered'}${val('name-ok') ? ' (confirmed)' : ''}`,
+      `4. Web server restart: ${val('restart') || 'not answered'}${val('restart') === 'at a set time' && val('restart-time') ? ' — ' + val('restart-time') : ''}`,
+      `5. "Nahuman na.": ${val('cebuano') || 'not answered'}${val('cebuano') === 'use another phrase' && val('cebuano-other') ? ' — ' + val('cebuano-other') : ''}`,
+      `6. Commit now: ${val('commit') || 'not answered'}`,
+    ];
+    $('#answers-text').value = lines.join('\n');
+
+    const data = {};
+    $$('input, textarea', form).forEach((el) => {
+      if (!el.name) return;
+      if (el.type === 'radio' || el.type === 'checkbox') { if (el.checked) data[el.name] = el.value; }
+      else data[el.name] = el.value;
+    });
+    store.set('asanaka-plan-answers', data);
+  }
+  form.addEventListener('input', update);
+  form.addEventListener('change', update);
+  update();
+
+  $('#copy').addEventListener('click', async () => {
+    const text = $('#answers-text').value;
+    try {
+      await navigator.clipboard.writeText(text);
+      $('#copied').textContent = 'Copied. Paste it into the chat.';
+    } catch {
+      $('#answers-text').select();
+      $('#copied').textContent = 'Selected. Press Ctrl+C to copy.';
+    }
+  });
+  $('#reset').addEventListener('click', () => {
+    $$('input, textarea', form).forEach((el) => {
+      if (el.type === 'radio' || el.type === 'checkbox') el.checked = false;
+      else if (el.id === 'display-name') el.value = 'Ameer Peralta';
+      else if (el.id !== 'answers-text') el.value = '';
+    });
+    $('#copied').textContent = '';
+    update();
+  });
+})();
+</script>
+</body>
+</html>

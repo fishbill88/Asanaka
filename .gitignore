@@ -1,0 +1,14 @@
+# Local only, never committed: secrets, VPS notes, seeded passwords.
+.env
+.env.*
+!.env.example
+.secrets/
+.local/
+*.local.*
+
+# Tooling output
+node_modules/
+dist/
+coverage/
+*.log
+.taste-skill/

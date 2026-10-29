@@ -1,0 +1,716 @@
+<meta charset="utf-8">
+<title>Asanaka Departures</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Asanaka design C: the sentence is the layout. Asa na ka? set as one huge line with a jeepney's route inside it, and a board that reads like a departures board.">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: the sentence is the layout. One mustard field, black ink; royal blue appears once, on the action.
+     Later sections speak in short statements with their proof beside them. */
+  --bg: #e1ac10;
+  --surface: #cd9d0f;
+  --paper: #f5e8c4;
+  --card: #f3dfa3;
+  --ink: #0b0b0b;
+  --muted: #4d3d0a;
+  --night: #0b0b0b;
+  --night-row: #1b1a17;
+  --night-ink: #f5e8c4;
+  --accent: #24338f;
+  --accent-ink: #ffffff;
+  --good: #2c7a4b;
+  --late: #a3261d;
+
+  --font: 'Hanken Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --step-small: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-lead: clamp(1.375rem, 1rem + 1vw, 1.875rem);
+  --step-head: clamp(2.25rem, 0.9rem + 3.9vw, 4.75rem);
+  --step-display: clamp(64px, 10.5vw, 168px);
+
+  --margin: clamp(16px, 2.8vw, 40px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
+  --t-press: 140ms;
+  --t-hover: 180ms;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: var(--step-body); line-height: 1.45; letter-spacing: -0.005em; -webkit-font-smoothing: antialiased; margin: 0; overflow-x: hidden; }
+html[data-view="board"], html[data-view="board"] body, html[data-view="signin"], html[data-view="signin"] body { overflow: hidden; height: 100%; }
+h1, h2, h3, h4, p, figure, ol { margin: 0; }
+h1, h2, h3 { text-wrap: balance; font-weight: 500; }
+a { color: inherit; }
+img { display: block; max-width: 100%; height: auto; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+::selection { background: var(--ink); color: var(--bg); }
+.sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.gutter { padding-left: max(var(--margin), env(safe-area-inset-left, 0px)); padding-right: max(var(--margin), env(safe-area-inset-right, 0px)); }
+.view[hidden] { display: none !important; }
+
+/* Buttons: rectangles, one fill. Blue is kept for the action. */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5em; min-height: 52px; padding: 0 24px; border: 0; border-radius: 0; background: var(--accent); color: var(--accent-ink); font-weight: 500; font-size: var(--step-body); text-decoration: none; cursor: pointer; transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease, color var(--t-hover) ease; }
+.btn:active { transform: scale(0.97); }
+.btn--paper { background: var(--paper); color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background: #1a2670; } .btn--paper:hover { background: #fff; } }
+.link { text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 0.2em; text-decoration-thickness: 0.07em; transition: text-decoration-color var(--t-hover) ease; }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: currentColor; } }
+
+/* ---------- landing ---------- */
+.nav { position: absolute; top: 0; left: 0; right: 0; z-index: 4; display: grid; grid-template-columns: 1fr 1fr; align-items: center; padding-top: max(24px, env(safe-area-inset-top, 0px)); font-size: 15px; }
+.nav .wordmark { font-weight: 500; text-decoration: none; justify-self: start; }
+.nav nav { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; }
+
+.hero { position: relative; min-height: 100svh; display: grid; grid-template-rows: 1fr auto 1fr; padding-block: 96px 32px; }
+.name { grid-row: 2; display: flex; align-items: baseline; justify-content: center; gap: 0.18em; font-size: var(--step-display); font-weight: 500; letter-spacing: -0.04em; line-height: 0.9; white-space: nowrap; }
+.slot { position: relative; display: inline-block; width: 1.6em; height: 0.52em; overflow: hidden; align-self: baseline; background: var(--ink); }
+.slot img { position: absolute; left: -75%; top: -288%; width: 256%; max-width: none; height: auto; }
+.hero-foot { grid-row: 3; align-self: end; display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 var(--margin); align-items: end; }
+.hero-foot p { grid-column: 6 / span 4; max-width: 38ch; font-size: 16px; }
+.hero-foot .btn { grid-column: 11 / span 2; justify-self: end; }
+@media (prefers-reduced-motion: no-preference) {
+  .js .slot { clip-path: inset(0 0 100% 0); animation: shutter 1100ms var(--ease-in-out) 350ms forwards; }
+  .js .slot img { transform: scale(1.12); transform-origin: 40% 50%; animation: settle 1500ms var(--ease-soft) 350ms forwards; }
+  .js .name [data-word] { display: inline-block; opacity: 0; transform: translateY(0.25em); animation: rise 900ms var(--ease-out) forwards; animation-delay: calc(var(--i) * 110ms + 100ms); }
+  .js [data-rise] { opacity: 0; transform: translateY(16px); animation: rise 800ms var(--ease-out) forwards; animation-delay: calc(var(--i, 0) * 90ms + 700ms); }
+}
+@keyframes shutter { to { clip-path: inset(0); } }
+@keyframes settle { to { transform: none; } }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .js [data-reveal] { opacity: 0; transform: translateY(24px); transition: opacity 700ms var(--ease-out), transform 900ms var(--ease-out); transition-delay: calc(var(--i, 0) * 80ms); }
+  .js [data-reveal].is-in { opacity: 1; transform: none; }
+}
+
+/* Route: the photograph from the hero, opened to full size, with its statement. */
+.route { display: grid; grid-template-columns: repeat(12, 1fr); gap: 32px var(--margin); padding-block: 160px; align-items: end; }
+.route-text { grid-column: 1 / span 5; display: grid; gap: 24px; }
+.route-text h2 { font-size: var(--step-head); letter-spacing: -0.045em; line-height: 0.95; }
+.route-text p { max-width: 40ch; }
+.route-stops { display: flex; flex-wrap: wrap; gap: 6px; }
+.route-stops span { padding: 6px 12px; background: var(--ink); color: var(--bg); font-weight: 500; font-size: 16px; }
+.route-stops span.is-now { background: var(--accent); color: var(--accent-ink); }
+.route-pic { grid-column: 7 / span 6; display: grid; gap: 10px; }
+.route-frame { overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+.route-frame img { width: 100%; height: 100%; object-fit: cover; }
+.route-pic figcaption { font-size: var(--step-small); }
+
+/* Departures: the board as a station board. */
+.dep-wrap { background: var(--night); color: var(--night-ink); overflow: hidden; padding: 0 max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px)); }
+.dep { list-style: none; padding: 0; margin: -36px 0; display: grid; gap: 4px; }
+.dep-row { display: grid; grid-template-columns: 5fr 1.6fr 1.6fr 1.1fr 2fr; align-items: center; gap: 0 16px; min-height: 72px; background: var(--night-row); font-size: var(--step-lead); line-height: 1.1; font-variant-numeric: tabular-nums; transition: background-color 260ms ease; }
+.dep-name { all: unset; box-sizing: border-box; display: block; height: 100%; padding: 18px 20px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dep-name:focus-visible { outline: 3px solid var(--bg); outline-offset: -3px; }
+.dep-who, .dep-due, .dep-sub { white-space: nowrap; overflow: hidden; }
+.dep-due { color: var(--bg); }
+.dep-due[data-state="overdue"] { color: #ff8a7a; }
+.dep-status { justify-self: end; margin-right: 8px; min-width: 7.2em; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 0.04em; padding: 0 10px; border: 0; cursor: pointer; font-size: var(--step-lead); font-weight: 500; transition: transform var(--t-press) var(--ease-out); perspective: 300px; }
+.dep-status:active { transform: scale(0.97); }
+.dep-status[data-s="todo"] { background: #3a3832; color: var(--night-ink); }
+.dep-status[data-s="doing"] { background: var(--bg); color: var(--ink); }
+.dep-status[data-s="review"] { background: var(--paper); color: var(--ink); }
+.dep-status[data-s="done"] { background: var(--good); color: #fff; cursor: default; }
+.flap { display: inline-block; min-width: 0.62em; text-align: center; backface-visibility: hidden; transform-origin: 50% 55%; }
+.dep-row.is-open { min-height: 216px; background: var(--accent); color: var(--accent-ink); align-items: start; }
+.dep-row.is-open .dep-name { white-space: normal; font-size: var(--step-head); letter-spacing: -0.04em; line-height: 0.95; padding-top: 20px; }
+.dep-row.is-open .dep-name { grid-column: 1 / 5; }
+.dep-row.is-open .dep-who, .dep-row.is-open .dep-due, .dep-row.is-open .dep-sub { display: none; }
+.dep-row.is-open > :not(.dep-name):not(.dep-status) { padding-top: 26px; }
+.dep-row.is-open .dep-status { margin-top: 14px; }
+.dep-ghost { pointer-events: none; }
+.dep-detail { grid-column: 1 / -1; display: none; padding: 0 20px 20px; font-size: 17px; max-width: 70ch; }
+.dep-row.is-open .dep-detail { display: block; }
+@media (hover: hover) and (pointer: fine) { .dep-row:not(.is-open):hover { background: #26241f; } }
+
+/* How it works: the sequence is written, one line per stage, stepping across. */
+.steps { background: var(--surface); padding-block: 180px 160px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 56px var(--margin); }
+.step { display: grid; gap: 12px; grid-column-end: span 7; }
+.step:nth-child(1) { grid-column-start: 1; }
+.step:nth-child(2) { grid-column-start: 3; }
+.step:nth-child(3) { grid-column-start: 5; }
+.step:nth-child(4) { grid-column-start: 7; grid-column-end: span 6; }
+.step h2, .step h3 { font-size: var(--step-head); letter-spacing: -0.045em; line-height: 1; white-space: nowrap; }
+.step:last-child h3 { color: var(--accent); }
+.step p { max-width: 34ch; color: var(--ink); }
+.word { display: inline-block; }
+
+/* Statements on colour fields. */
+.field { position: relative; min-height: 76svh; display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 var(--margin); padding-block: 28px; }
+.field p { grid-column: 8 / span 4; grid-row: 1; align-self: start; max-width: 30ch; font-size: 18px; }
+.field h2 { grid-column: 1 / -1; grid-row: 2; align-self: end; font-size: var(--step-display); letter-spacing: -0.05em; line-height: 0.9; }
+.field h2 .ln { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.field h2 .ln > span { display: block; }
+.field:nth-of-type(even) p { grid-column: 2 / span 4; }
+.field:nth-of-type(even) h2 { text-align: right; }
+.f-night { background: var(--night); color: var(--bg); }
+.f-paper { background: var(--paper); color: var(--ink); }
+.f-brown { background: var(--muted); color: var(--bg); }
+.field { grid-template-rows: auto 1fr; }
+
+/* Close: the idea again, inverted. */
+.again { min-height: 90svh; background: var(--night); color: var(--bg); display: grid; grid-template-rows: 1fr auto; padding-block: 12svh 40px; }
+.again h2 { font-size: var(--step-display); letter-spacing: -0.05em; line-height: 0.9; }
+.again h2 span { display: block; }
+.again-foot { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px var(--margin); align-items: end; }
+.again-foot p { grid-column: 1 / span 5; font-size: 20px; }
+.again-foot .btn { grid-column: 10 / span 3; justify-self: end; min-height: 56px; min-width: 200px; }
+
+/* Footer: an invitation over the name, cut by the bottom edge. */
+.foot { position: relative; background: var(--night); color: var(--bg); min-height: 100svh; overflow: hidden; padding-block: 160px 0; display: grid; grid-template-rows: auto 1fr auto auto; }
+.foot-top { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px var(--margin); align-items: start; }
+.foot-invite { grid-column: 1 / span 6; display: grid; gap: 28px; justify-items: start; }
+.foot-invite h2 { font-size: var(--step-head); letter-spacing: -0.045em; line-height: 0.95; }
+.foot-invite h2 span { display: block; }
+.foot-pic { grid-column: 8 / span 5; display: grid; gap: 8px; }
+.foot-pic .frame { overflow: hidden; aspect-ratio: 3 / 2; }
+.foot-pic img { width: 100%; height: 100%; object-fit: cover; }
+.foot-pic figcaption { font-size: var(--step-small); color: var(--night-ink); }
+.foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; font-size: var(--step-small); color: var(--night-ink); padding-block: 56px 10px; }
+.foot-row div { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.foot-word { font-size: clamp(120px, 28vw, 460px); font-weight: 500; letter-spacing: -0.06em; line-height: 0.8; white-space: nowrap; transform: translateY(24%); margin-left: -0.04em; }
+
+/* ---------- sign-in: the form is a sentence ---------- */
+.signin { position: fixed; inset: 0; z-index: 20; background: var(--bg); overflow-y: auto; display: grid; grid-template-rows: auto 1fr auto; padding-block: max(24px, env(safe-area-inset-top, 0px)) 32px; }
+.signin-top { display: flex; justify-content: space-between; font-size: 15px; }
+.signin-top a { text-decoration: none; font-weight: 500; }
+.say { align-self: center; display: grid; gap: 28px; }
+.say-line { font-size: clamp(36px, 5.4vw, 88px); letter-spacing: -0.04em; line-height: 1.12; font-weight: 500; display: flex; flex-wrap: wrap; align-items: center; gap: 0.1em 0.24em; max-width: 15em; }
+.say-line input { font: inherit; letter-spacing: inherit; height: 1.1em; width: 6.4em; padding: 0 0.3em; border: 0; border-radius: 0; background: var(--card); color: var(--ink); }
+.say-line input::placeholder { color: var(--muted); opacity: 0.75; }
+.say-line input:focus { outline: 4px solid var(--ink); outline-offset: 0; }
+.say-line input[aria-invalid="true"] { outline: 4px solid var(--late); }
+.say-line .pass-wrap { display: inline-flex; align-items: center; gap: 0.15em; }
+.say-line .reveal { height: 1.1em; padding: 0 0.35em; border: 0; background: var(--surface); font-size: 0.32em; cursor: pointer; height: 3.4em; }
+.say-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; }
+.say-row .btn { min-width: 220px; min-height: 60px; font-size: 19px; }
+.form-error { min-height: 1.45em; color: var(--late); font-weight: 500; }
+.btn[aria-busy="true"] { pointer-events: none; }
+.spin { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: none; }
+.btn[aria-busy="true"] .spin { display: inline-block; animation: spin 600ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.say-note { font-size: 15px; color: var(--muted); }
+.say-note a { color: var(--ink); }
+
+/* ---------- the board app ---------- */
+.app { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: auto 1fr; background: var(--bg); }
+.app-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: max(14px, env(safe-area-inset-top, 0px)) max(28px, env(safe-area-inset-right, 0px)) 0 max(28px, env(safe-area-inset-left, 0px)); font-size: 15px; }
+.app-top a { text-decoration: none; font-weight: 500; }
+.app-top .me { display: flex; align-items: center; gap: 10px; }
+.app-top button { min-height: 40px; padding: 0 14px; border: 0; background: var(--surface); cursor: pointer; font-size: 14px; transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease; }
+.app-top button:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .app-top button:hover { background: var(--card); } }
+.app-main { min-width: 0; min-height: 0; display: grid; }
+
+.bd { display: grid; grid-template-rows: auto 1fr; min-height: 0; overflow: hidden; }
+.bd-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 24px; padding: 18px 28px 20px; }
+.bd-proj { display: flex; align-items: flex-end; gap: 18px; }
+.bd-proj-name { font-size: clamp(36px, 4.4vw, 64px); font-weight: 500; letter-spacing: -0.045em; line-height: 0.9; }
+.bd-people { display: flex; gap: 4px; padding-bottom: 4px; }
+.bd-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bd-filters { display: flex; gap: 4px; }
+.bd-filter, .bd-primary, .bd-btn, .bd-btn-quiet, .bd-add, .bd-newcol-btn, .bd-col-plus { border: 0; border-radius: 0; cursor: pointer; transition: background-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out); }
+.bd-filter:active, .bd-primary:active, .bd-btn:active, .bd-btn-quiet:active, .bd-add:active, .bd-newcol-btn:active, .bd-col-plus:active { transform: scale(0.97); }
+.bd-filter { min-height: 42px; padding: 0 14px; background: var(--surface); font-size: 15px; }
+.bd-filter[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.bd-primary { min-height: 42px; padding: 0 18px 0 14px; background: var(--accent); color: var(--accent-ink); font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.bd-primary svg, .bd-add svg, .bd-newcol-btn svg { width: 18px; height: 18px; }
+@media (hover: hover) and (pointer: fine) { .bd-filter:not([aria-pressed="true"]):hover { background: var(--card); } .bd-primary:hover { background: #1a2670; } }
+.bd-scroll { overflow-x: auto; overflow-y: hidden; min-height: 0; padding: 0 28px 20px; }
+.bd-cols { display: flex; gap: 18px; height: 100%; }
+.bd-col { flex: none; width: 300px; display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+.bd-col-head { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+.bd-col-swatch { display: none; }
+.bd-col-name { font-size: 24px; font-weight: 500; letter-spacing: -0.03em; cursor: text; }
+.bd-col-rename { font-size: 22px; font-weight: 500; border: 0; padding: 2px 8px; width: 170px; background: var(--card); }
+.bd-col-count { min-width: 30px; height: 30px; padding: 0 6px; display: inline-grid; place-items: center; background: var(--ink); color: var(--bg); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.bd-col-plus { margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; background: none; }
+.bd-col-plus svg { width: 22px; height: 22px; }
+@media (hover: hover) and (pointer: fine) { .bd-col-plus:hover { background: var(--surface); } }
+.bd-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; min-height: 24px; padding: 2px 2px 6px; overscroll-behavior: contain; scrollbar-width: thin; }
+.bd-add { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; margin-top: 6px; background: none; color: var(--muted); font-size: 15px; font-weight: 500; }
+@media (hover: hover) and (pointer: fine) { .bd-add:hover { background: var(--surface); color: var(--ink); } }
+.bd-newcol { flex: none; width: 240px; padding-top: 8px; }
+.bd-newcol-btn { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 0 14px; background: var(--surface); font-size: 15px; font-weight: 500; }
+.bd-newcol-input { width: 100%; min-height: 48px; padding: 0 14px; border: 0; background: var(--card); font-size: 15px; }
+.bd-newcol-input:focus { outline: 3px solid var(--ink); }
+
+/* Cards: paper on mustard; a finished card turns into a ticket in the ink. */
+.bd-card { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 14px 14px 12px 12px; background: var(--paper); color: var(--ink); font-size: 15px; line-height: 1.35; transition: background-color 260ms ease, color 260ms ease; }
+@media (hover: hover) and (pointer: fine) { .bd-card:not(.is-done):hover { background: #fbf2d9; } }
+.bd-card.is-selected { outline: 3px solid var(--ink); outline-offset: -3px; }
+.bd-card.is-placeholder { background: var(--surface); }
+.bd-ghost { box-shadow: 0 22px 44px rgba(60, 40, 0, 0.35); /* taste-skill-ignore: a dragged card really floats */ }
+.bd-check { width: 22px; height: 22px; padding: 0; border: 2px solid var(--ink); border-radius: 0; background: none; color: transparent; display: grid; place-items: center; cursor: pointer; transition: background-color 200ms ease, color 200ms ease, transform var(--t-press) var(--ease-out); }
+.bd-check svg { width: 18px; height: 18px; }
+.bd-check:active { transform: scale(0.86); }
+@media (hover: hover) and (pointer: fine) { .bd-check:hover { color: var(--muted); } }
+.bd-card.is-done { background: var(--ink); color: var(--bg); }
+.bd-card.is-done .bd-check { background: var(--bg); border-color: var(--bg); color: var(--ink); }
+.bd-card.is-done .bd-foot, .bd-card.is-done .bd-due { color: var(--paper); }
+.bd-check-path { stroke-dasharray: 20; stroke-dashoffset: 0; }
+.bd-card.is-done .bd-check-path { animation: draw 360ms var(--ease-out) both; }
+@keyframes draw { from { stroke-dashoffset: 20; } }
+.bd-card-body { display: grid; gap: 9px; min-width: 0; }
+.bd-title { font-weight: 500; overflow-wrap: anywhere; }
+.bd-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.bd-chip { padding: 2px 8px; font-size: 13px; font-weight: 500; background: var(--card); }
+.bd-chip[data-v="high"] { background: var(--ink); color: var(--bg); }
+.bd-chip[data-v="medium"], .bd-chip[data-v="at_risk"] { background: var(--muted); color: var(--paper); }
+.bd-chip[data-v="on_track"] { background: var(--good); color: #fff; }
+.bd-chip[data-v="off_track"] { background: var(--late); color: #fff; }
+.bd-card.is-done .bd-chip { background: #2b2925; color: var(--paper); }
+.bd-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.bd-avatar { width: 26px; height: 26px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 500; background: var(--ink); color: var(--bg); flex: none; }
+.bd-avatar[data-p="ad"] { background: var(--muted); color: var(--paper); }
+.bd-card.is-done .bd-avatar { background: var(--bg); color: var(--ink); }
+.bd-people .bd-avatar { width: 34px; height: 34px; font-size: 13px; }
+.bd-due[data-state="today"] { color: var(--accent); font-weight: 500; }
+.bd-due[data-state="overdue"] { color: var(--late); font-weight: 500; }
+.bd-due[data-state="soon"] { color: var(--ink); }
+.bd-counts { display: inline-flex; gap: 10px; margin-left: auto; }
+.bd-count { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.bd-count svg { width: 14px; height: 14px; }
+.bd-composer { display: grid; gap: 8px; padding: 10px; background: var(--paper); }
+.bd-composer textarea { width: 100%; resize: none; border: 0; padding: 10px; background: var(--card); font-size: 15px; }
+.bd-composer textarea:focus { outline: 3px solid var(--ink); }
+.bd-composer-row { display: flex; gap: 6px; }
+.bd-btn { min-height: 38px; padding: 0 14px; background: var(--accent); color: var(--accent-ink); font-size: 14px; font-weight: 500; }
+.bd-btn-quiet { min-height: 38px; padding: 0 12px; background: none; font-size: 14px; color: var(--muted); }
+@media (hover: hover) and (pointer: fine) { .bd-btn:hover { background: #1a2670; } .bd-btn-quiet:hover { color: var(--ink); } }
+
+/* Task pane: paper overlay with an ink header. */
+.pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(500px, 100%); z-index: 30; display: grid; grid-template-rows: auto 1fr auto; background: var(--paper); box-shadow: -20px 0 60px rgba(60, 40, 0, 0.3); /* taste-skill-ignore: an overlay drawer */ }
+.pane-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 12px 12px 20px; background: var(--ink); color: var(--bg); }
+.pane-complete { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 16px 0 10px; border: 0; background: #2b2925; color: var(--bg); cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 220ms ease, transform var(--t-press) var(--ease-out); }
+.pane-complete svg { width: 18px; height: 18px; }
+.pane-complete:active { transform: scale(0.97); }
+.pane-complete[aria-pressed="true"] { background: var(--bg); color: var(--ink); }
+.pane-close { width: 42px; height: 42px; display: grid; place-items: center; border: 0; background: none; color: var(--bg); cursor: pointer; }
+.pane-close svg { width: 22px; height: 22px; }
+.pane-scroll { overflow-y: auto; padding: 20px 22px 28px; display: grid; gap: 24px; align-content: start; overscroll-behavior: contain; }
+.pane-title { width: 100%; resize: none; overflow: hidden; border: 0; background: none; padding: 0; font-size: 32px; font-weight: 500; letter-spacing: -0.035em; line-height: 1.05; }
+.pane-title:focus { outline: none; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; }
+.pane-fields { display: grid; gap: 8px; margin: 0; }
+.pane-field { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 12px; }
+.pane-field dt { font-size: 14px; color: var(--muted); }
+.pane-field dd { margin: 0; min-width: 0; }
+.pane-input { width: 100%; min-height: 42px; padding: 0 10px; border: 0; background: var(--card); font-size: 15px; }
+.pane-input:focus, .pane-notes:focus, .pane-say textarea:focus { outline: 3px solid var(--ink); outline-offset: 0; }
+.pane-seg { display: flex; flex-wrap: wrap; gap: 3px; }
+.pane-seg button { min-height: 34px; padding: 0 10px; border: 0; background: var(--card); cursor: pointer; font-size: 13px; transition: background-color var(--t-hover) ease, color var(--t-hover) ease; }
+.pane-seg button[aria-checked="true"] { background: var(--ink); color: var(--bg); }
+.pane-block { display: grid; gap: 10px; }
+.pane-h { font-size: 15px; font-weight: 500; }
+.pane-sub-count { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.pane-notes { width: 100%; resize: vertical; min-height: 84px; border: 0; padding: 10px; background: var(--card); font-size: 15px; line-height: 1.5; }
+.pane-subs, .pane-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.pane-sub { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 0 10px; background: var(--card); font-size: 15px; }
+.pane-sub.is-done span { color: var(--muted); text-decoration: line-through; }
+.pane-sub-check { width: 20px; height: 20px; flex: none; padding: 0; border: 2px solid var(--ink); background: none; color: transparent; display: grid; place-items: center; cursor: pointer; }
+.pane-sub-check svg { width: 16px; height: 16px; }
+.pane-sub-check[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.pane-comment { display: grid; grid-template-columns: auto 1fr; gap: 10px; padding: 8px 0; }
+.pane-comment-by { font-size: 14px; }
+.pane-comment-by span { color: var(--muted); }
+.pane-comment-body { font-size: 15px; margin-top: 2px; }
+.pane-empty { color: var(--muted); font-size: 15px; }
+.pane-say { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: end; padding: 12px 14px 14px 20px; background: var(--card); }
+.pane-say textarea { resize: none; min-height: 42px; max-height: 120px; border: 0; padding: 10px; background: var(--paper); font-size: 15px; }
+
+/* "Nahuman na." The celebration says it across the bottom of the screen. */
+.done-band { position: fixed; left: 0; right: 0; bottom: 0; z-index: 95; background: var(--ink); color: var(--bg); overflow: hidden; pointer-events: none; padding: 14px max(24px, env(safe-area-inset-left, 0px)) 18px; display: grid; gap: 4px; }
+.done-band[hidden] { display: none; }
+.done-band strong { font-size: clamp(64px, 12vw, 200px); font-weight: 500; letter-spacing: -0.05em; line-height: 0.85; white-space: nowrap; }
+.done-band span { font-size: 17px; color: var(--paper); }
+
+/* View change: a black board drops, flips to where you're going, and lifts. */
+.board-drop { position: fixed; inset: 0; z-index: 100; background: var(--ink); color: var(--bg); display: grid; place-items: center; pointer-events: none; transform: translateY(-101%); }
+.board-drop[hidden] { display: none; }
+.board-drop p { font-size: clamp(48px, 9vw, 140px); font-weight: 500; letter-spacing: -0.03em; display: flex; perspective: 600px; }
+
+/* ---------- tablet and phone ---------- */
+@media (max-width: 900px) {
+  .route-text, .route-pic { grid-column: 1 / -1; }
+  .route { padding-block: 96px; }
+  .dep-row { grid-template-columns: 1fr auto; min-height: 64px; font-size: 20px; }
+  .dep-who, .dep-due, .dep-sub { display: none; }
+  .dep-status { font-size: 18px; min-width: 6.6em; min-height: 46px; }
+  .dep-row.is-open { min-height: 200px; }
+  .dep-row.is-open .dep-name { font-size: 22px; letter-spacing: -0.02em; line-height: 1.1; }
+  .dep-detail { font-size: 16px; }
+  .steps { grid-template-columns: 1fr; padding-block: 96px; gap: 40px; }
+  .step { grid-column: 1 !important; }
+  .step:nth-child(2) { padding-left: 6vw; }
+  .step:nth-child(3) { padding-left: 12vw; }
+  .step:nth-child(4) { padding-left: 18vw; }
+  .step h2, .step h3 { font-size: 8.4vw; white-space: normal; }
+  .field { min-height: 64svh; }
+  .field p, .field:nth-of-type(even) p { grid-column: 1 / span 10; font-size: 16px; }
+  .field h2 { font-size: 13vw; }
+  .field:nth-of-type(even) h2 { text-align: left; }
+  .again h2 { font-size: 13vw; }
+  .again-foot p { grid-column: 1 / -1; font-size: 17px; }
+  .again-foot .btn { grid-column: 1 / -1; justify-self: stretch; }
+  .foot-invite, .foot-pic { grid-column: 1 / -1; }
+  .foot-word { font-size: 34vw; }
+  .app-top { padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+  .bd-top { padding: 12px 16px 14px; }
+  .bd-scroll { padding: 0 16px 16px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; }
+  .bd-col { width: 84vw; scroll-snap-align: start; }
+  .bd-filters { overflow-x: auto; }
+  .pane-field { grid-template-columns: 86px 1fr; }
+}
+@media (max-width: 600px) {
+  .nav { grid-template-columns: 1fr auto; }
+  .nav nav a:not(:last-child) { display: none; }
+  .name { flex-direction: column; align-items: center; gap: 0.06em; font-size: 19vw; }
+  .name .slot { order: 2; width: calc(100vw - 32px); height: auto; aspect-ratio: 3 / 2; font-size: 16px; }
+  .name .slot img { left: -55%; top: -76%; width: 208%; }
+  .name [data-word="ka"] { order: 3; }
+  .hero-foot p { grid-column: 1 / -1; }
+  .hero-foot .btn { grid-column: 1 / -1; justify-self: stretch; margin-top: 16px; }
+  .say-line { font-size: 9vw; }
+  .say-line input { width: 100%; }
+  .say-line .pass-wrap { width: 100%; }
+}
+</style>
+
+<div id="view-landing" class="view">
+  <header class="nav gutter">
+    <a class="wordmark" href="#top">Asanaka</a>
+    <nav aria-label="Main">
+      <a class="link" href="#route">The route</a>
+      <a class="link" href="#departures">Departures</a>
+      <a class="link" href="#steps">How it moves</a>
+      <a class="link" href="#signin">Sign in</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero gutter" id="top" aria-labelledby="hero-title">
+      <h1 class="name" id="hero-title" aria-label="Asa na ka?">
+        <span class="w1"><span data-word="asa" style="--i:0">Asa</span> <span data-word="na" style="--i:1">na</span></span>
+        <span class="slot" aria-hidden="true"><img src="assets/traditional-jeepney-in-cebu-it-park-2025.jpg" width="1920" height="1440" alt=""></span>
+        <span data-word="ka" style="--i:2">ka?</span>
+      </h1>
+      <div class="hero-foot">
+        <p data-rise style="--i:0">Cebuano for “where are you now?” Asanaka is a kanban board that answers it for every task your team has.</p>
+        <a class="btn" href="#signin" data-rise style="--i:1">Sign in</a>
+      </div>
+    </section>
+
+    <section class="route gutter" id="route" aria-labelledby="route-title">
+      <div class="route-text">
+        <h2 id="route-title" data-reveal>Every jeepney says where it goes.</h2>
+        <p data-reveal style="--i:1">7B runs Apas, Lahug, Jones, Carbon. The stops are painted down the side in order, so you know the route before you board. A task on Asanaka carries its route the same way.</p>
+        <div class="route-stops" data-reveal style="--i:2" aria-label="A task’s route"><span>To do</span><span class="is-now">Doing</span><span>Review</span><span>Done</span></div>
+      </div>
+      <figure class="route-pic">
+        <div class="route-frame"><img src="assets/traditional-jeepney-in-cebu-it-park-2025.jpg" width="1920" height="1440" loading="lazy" alt="A white and red jeepney at Cebu IT Park with its route painted on the side: 7B Apas Lahug Jones Carbon."></div>
+        <figcaption>Route 7B at Cebu IT Park. Photo by Wide Awake!, <a href="https://commons.wikimedia.org/wiki/File:Traditional_jeepney_in_Cebu_IT_Park_(2025-04-06).jpg" rel="noopener">CC BY 4.0, via Wikimedia Commons</a>.</figcaption>
+      </figure>
+    </section>
+
+    <section class="dep-wrap" id="departures" aria-labelledby="dep-title">
+      <h2 id="dep-title" class="sr-only">Departures: every unfinished task, by when it’s due. Press a status to move the task along.</h2>
+      <ol class="dep" data-ui id="dep"></ol>
+    </section>
+
+    <section class="steps gutter" id="steps" aria-labelledby="steps-title">
+      <div class="step"><h2 id="steps-title" data-scrub>First you add it.</h2><p>Type a name at the bottom of a section and press Enter. The box stays open for the next one.</p></div>
+      <div class="step"><h3 data-scrub>Then you drag it along.</h3><p>Pick it up and the cards around it make room. Drop it where it is now.</p></div>
+      <div class="step"><h3 data-scrub>Someone checks it over.</h3><p>In Review, the person who checks it sees every comment and subtask on it.</p></div>
+      <div class="step"><h3 data-scrub>It lands in Done.</h3><p>Tick it, and the board says so out loud before the card settles in Done.</p></div>
+    </section>
+
+    <section class="field f-night gutter" aria-labelledby="f1">
+      <p data-reveal>Pick a card up and the others make room. Drop it in another section and the whole team sees the move.</p>
+      <h2 id="f1"><span class="ln"><span>Drag it</span></span><span class="ln"><span>anywhere.</span></span></h2>
+    </section>
+    <section class="field f-paper gutter" aria-labelledby="f2">
+      <p data-reveal>Click a card and its pane slides in: who has it, when it’s due, its subtasks and comments. Escape puts you back where you were.</p>
+      <h2 id="f2"><span class="ln"><span>Open the</span></span><span class="ln"><span>whole task.</span></span></h2>
+    </section>
+    <section class="field f-brown gutter" aria-labelledby="f3">
+      <p data-reveal>Tick a task and the board says <em>Nahuman na</em>, Cebuano for “it’s finished,” across the bottom of the screen. Then the card settles in Done.</p>
+      <h2 id="f3"><span class="ln"><span>Finish it</span></span><span class="ln"><span>out loud.</span></span></h2>
+    </section>
+
+    <section class="again gutter" aria-labelledby="again-title">
+      <h2 id="again-title"><span>Asa na ka?</span><span>Now you know.</span></h2>
+      <div class="again-foot">
+        <p>Sign in and the board opens where your team left it.</p>
+        <a class="btn" href="#signin">Sign in</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot gutter">
+    <div class="foot-top">
+      <div class="foot-invite">
+        <h2><span>Built in the open.</span><span>Read how.</span></h2>
+        <a class="btn btn--paper" href="https://github.com/fishbill88/Asanaka/blob/main/PLAN.md" rel="noopener">Read the plan</a>
+      </div>
+      <figure class="foot-pic">
+        <div class="frame"><img src="assets/cebu-it-park-transport-terminal-jan-2024.jpg" width="1920" height="1446" loading="lazy" alt="The Cebu IT Park transport terminal under big acacia trees, with buses parked at numbered bays 09 to 12."></div>
+        <figcaption>Bays 09 to 12 at the Cebu IT Park terminal. Photo, <a href="https://commons.wikimedia.org/wiki/File:Cebu_IT_Park_Transport_Terminal,_Jan_2024_(2).jpg" rel="noopener">CC BY-SA 4.0, via Wikimedia Commons</a>.</figcaption>
+      </figure>
+    </div>
+    <span></span>
+    <div class="foot-row">
+      <div><a class="link" href="https://github.com/fishbill88/Asanaka" rel="noopener">GitHub</a><a class="link" href="#departures">Departures</a><a class="link" href="#signin">Sign in</a><span>Asa na ka? is Cebuano for “where are you now?”</span></div>
+      <div><span>Pictures via Wikimedia Commons: route 7B by Wide Awake! (CC BY 4.0); the terminal (CC BY-SA 4.0).</span><span>© 2026 Asanaka, a design prototype with sample data.</span></div>
+    </div>
+    <p class="foot-word" aria-hidden="true">Asanaka</p>
+  </footer>
+</div>
+
+<section id="view-signin" class="view signin gutter" hidden aria-labelledby="signin-title">
+  <div class="signin-top"><a href="#">Asanaka</a><a class="link" href="#">Back to the page</a></div>
+  <form class="say" id="signin-form" novalidate>
+    <h1 id="signin-title" class="sr-only">Sign in</h1>
+    <p class="say-line">
+      <span>I’m</span>
+      <input id="si-user" aria-label="Username" placeholder="username" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <span>and my password is</span>
+      <span class="pass-wrap"><input id="si-pass" type="password" aria-label="Password" placeholder="••••••" autocomplete="current-password"><button type="button" class="reveal" aria-controls="si-pass" aria-pressed="false">Show</button></span>
+    </p>
+    <p class="form-error" id="si-error" role="alert"></p>
+    <div class="say-row">
+      <button class="btn" type="submit"><span class="spin" aria-hidden="true"></span><span class="label">Sign in</span></button>
+      <p class="say-note">Prototype: any username and password opens the board.</p>
+    </div>
+  </form>
+  <span></span>
+</section>
+
+<section id="view-board" class="view app" hidden aria-label="Board">
+  <div class="app-top"><a href="#">Asanaka</a><div class="me"><span class="bd-avatar" data-p="ap">AP</span><span>Ameer Peralta</span><button type="button" data-signout>Sign out</button></div></div>
+  <div class="app-main"><div id="board"></div></div>
+</section>
+
+<div class="done-band" aria-hidden="true" hidden><strong>Nahuman na.</strong><span></span></div>
+<div class="board-drop" aria-hidden="true" hidden><p></p></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="board.js"></script>
+<script>
+(function () {
+  'use strict';
+  const B = window.AsanakaBoard;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const GLYPHS = 'ABCDEFGHIJKLMNOPRSTUVWY';
+
+  // Split-flap: each letter flips through a few others before it lands.
+  function flapTo(el, word, { cells = 0, done } = {}) {
+    const text = word.padEnd(cells, ' ');
+    el.innerHTML = [...text].map((c) => `<span class="flap">${c === ' ' ? '&nbsp;' : B.esc(c)}</span>`).join('');
+    if (reduced()) { done?.(); return; }
+    const flaps = $$('.flap', el);
+    let left = flaps.length;
+    flaps.forEach((f, i) => {
+      const target = text[i];
+      let n = target === ' ' ? 0 : 2 + Math.floor(Math.random() * 3);
+      const step = () => {
+        f.textContent = n > 0 ? GLYPHS[Math.floor(Math.random() * GLYPHS.length)] : (target === ' ' ? ' ' : target);
+        f.animate([{ transform: 'rotateX(-80deg)', opacity: 0.4 }, { transform: 'rotateX(0deg)', opacity: 1 }], { duration: 70, easing: 'ease-out' });
+        if (n-- > 0) setTimeout(step, 62); else if (--left === 0) done?.();
+      };
+      setTimeout(step, i * 34);
+    });
+  }
+
+  // "Nahuman na." across the bottom of the screen.
+  const band = $('.done-band');
+  let bandTimer = 0;
+  function sayDone(title) {
+    if (reduced()) return;
+    clearTimeout(bandTimer);
+    $('span', band).textContent = title + ' is finished.';
+    band.hidden = false;
+    const word = $('strong', band);
+    band.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' });
+    word.animate([{ transform: 'translateX(18%)' }, { transform: 'translateX(-4%)' }], { duration: 1700, easing: 'cubic-bezier(0.33, 1, 0.68, 1)', fill: 'forwards' });
+    bandTimer = setTimeout(() => {
+      band.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(101%)' }], { duration: 300, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', fill: 'forwards' }).onfinish = () => { band.hidden = true; };
+    }, 1500);
+  }
+
+  // ---- the board
+  const board = B.mount($('#board'), {
+    celebrate({ task, layer, x, y }) {
+      B.burst(layer, x, y, { colors: ['#0b0b0b', '#f5e8c4', '#24338f'], count: 14, size: 10, distance: 110, gravity: 70, spread: Math.PI * 2 });
+      sayDone(task.title);
+    },
+  });
+  const order = () => board.data.sections.map((s) => s.id);
+  const sectionName = (id) => board.data.sections.find((s) => s.id === id)?.name || id;
+
+  // ---- views: a black board drops, flips to where you're going, and lifts
+  let signedIn = false;
+  const views = { landing: $('#view-landing'), signin: $('#view-signin'), board: $('#view-board') };
+  let current = 'landing';
+  const drop = $('.board-drop');
+  const viewFor = (h) => (h === 'signin' ? 'signin' : h === 'board' ? 'board' : 'landing');
+  const LABEL = { landing: 'Asanaka', signin: 'Sign in', board: 'Asanaka launch' };
+  function show(name) {
+    for (const [k, el] of Object.entries(views)) el.hidden = k !== name;
+    document.documentElement.dataset.view = name;
+    current = name;
+    if (name === 'landing') { window.ScrollTrigger && ScrollTrigger.refresh(); renderDepartures(); }
+    if (name === 'signin') setTimeout(() => ($('#si-user').value ? $('#si-pass') : $('#si-user')).focus(), 30);
+  }
+  let turn = 0;
+  async function go(name) {
+    if (name === current) return;
+    if (reduced()) { show(name); return; }
+    const mine = ++turn;
+    drop.getAnimations().forEach((a) => a.cancel());
+    drop.hidden = false;
+    try {
+      await drop.animate([{ transform: 'translateY(-101%)' }, { transform: 'translateY(0)' }], { duration: 380, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', fill: 'forwards' }).finished;
+      if (mine !== turn) return;
+      await new Promise((resolve) => flapTo($('p', drop), LABEL[name], { done: resolve }));
+      if (mine !== turn) return;
+      show(name);
+      if (name === 'landing') window.scrollTo(0, 0);
+      await drop.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-101%)' }], { duration: 420, delay: 120, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', fill: 'forwards' }).finished;
+    } catch { if (mine === turn) show(name); }
+    if (mine !== turn) return;
+    drop.getAnimations().forEach((a) => a.cancel());
+    drop.hidden = true;
+  }
+  function route() {
+    let name = viewFor(location.hash.slice(1));
+    if (name === 'board' && !signedIn) { history.replaceState(null, '', '#signin'); name = 'signin'; }
+    if (name === 'landing' && current === 'landing') return;
+    go(name);
+  }
+  addEventListener('hashchange', route);
+  { const first = viewFor(location.hash.slice(1)); if (first !== 'landing') { const n = first === 'board' && !signedIn ? 'signin' : first; if (n !== first) history.replaceState(null, '', '#signin'); show(n); } }
+
+  // ---- sign-in: the form is a sentence
+  const form = $('#signin-form');
+  const err = $('#si-error');
+  $('.reveal', form).addEventListener('click', (e) => {
+    const p = $('#si-pass');
+    const on = p.type === 'password';
+    p.type = on ? 'text' : 'password';
+    e.currentTarget.textContent = on ? 'Hide' : 'Show';
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+  });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const u = $('#si-user'), p = $('#si-pass');
+    u.removeAttribute('aria-invalid'); p.removeAttribute('aria-invalid');
+    if (!u.value.trim()) { err.textContent = 'Enter your username in the first blank.'; u.setAttribute('aria-invalid', 'true'); u.focus(); return; }
+    if (!p.value) { err.textContent = 'Enter your password in the second blank.'; p.setAttribute('aria-invalid', 'true'); p.focus(); return; }
+    err.textContent = '';
+    const btn = $('button[type="submit"]', form);
+    btn.setAttribute('aria-busy', 'true');
+    $('.label', btn).textContent = 'Signing in';
+    setTimeout(() => { signedIn = true; btn.removeAttribute('aria-busy'); $('.label', btn).textContent = 'Sign in'; p.value = ''; location.hash = 'board'; }, 650);
+  });
+  $$('[data-signout]').forEach((b) => b.addEventListener('click', () => { signedIn = false; board.close(); location.hash = ''; }));
+
+  // ---- departures: every task, by when it's due; a status press moves it along
+  const dep = $('#dep');
+  let openId = null, flipping = false;
+  function rows() {
+    const key = (t) => (t.due ? B.due(t).diff : 999);
+    // Finished tasks have departed: the board lists what is still on its way.
+    return board.data.tasks.filter((t) => !t.done).sort((a, b) => key(a) - key(b)).slice(0, 9);
+  }
+  function renderDepartures() {
+    if (flipping) return;
+    const list = rows();
+    if (!openId || !list.find((t) => t.id === openId)) openId = list[2]?.id;
+    const ghost = '<li class="dep-row dep-ghost" aria-hidden="true"></li>';
+    dep.innerHTML = ghost + list.map((t) => {
+      const d = B.due(t);
+      const subs = t.subtasks.length ? `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}` : '';
+      const who = t.assignee ? B.PEOPLE[t.assignee].name.split(' ')[0] : 'Nobody';
+      const last = t.comments[t.comments.length - 1];
+      const next = order()[order().indexOf(t.section) + 1];
+      const detail = `${t.assignee ? B.PEOPLE[t.assignee].name + ' has it' : 'Nobody has it yet'}, ${d ? (t.done ? 'finished' : 'due ' + (['Today', 'Tomorrow', 'Yesterday'].includes(d.label) ? d.label.toLowerCase() : d.label)) : 'no due date'}${subs ? `, ${subs} subtasks done` : ''}.` + (last ? ` Last word from ${B.PEOPLE[last.by].name.split(' ')[0]}: “${last.body}”` : '');
+      return `<li class="dep-row${t.id === openId ? ' is-open' : ''}" data-id="${t.id}">
+        <button type="button" class="dep-name" aria-expanded="${t.id === openId}">${B.esc(t.title)}</button>
+        <span class="dep-who">${who}</span>
+        <span class="dep-due" data-state="${d ? d.state : ''}">${d ? d.label : ''}</span>
+        <span class="dep-sub">${subs}</span>
+        <button type="button" class="dep-status" data-s="${t.section}" ${t.done || !next ? 'aria-disabled="true"' : ''} aria-label="${sectionName(t.section)}${next && !t.done ? ', move to ' + sectionName(next) : ''}">${[...sectionName(t.section)].map((c) => `<span class="flap">${c === ' ' ? '&nbsp;' : B.esc(c)}</span>`).join('')}</button>
+        <p class="dep-detail">${B.esc(detail)}</p>
+      </li>`;
+    }).join('') + ghost;
+  }
+  dep.addEventListener('click', (e) => {
+    const row = e.target.closest('.dep-row');
+    if (!row) return;
+    const id = row.dataset.id;
+    if (e.target.closest('.dep-name')) {
+      openId = id;
+      const was = $('.dep-row.is-open', dep);
+      const before = new Map($$('.dep-row', dep).map((r) => [r, r.getBoundingClientRect().top]));
+      was?.classList.remove('is-open');
+      was && $('.dep-name', was).setAttribute('aria-expanded', 'false');
+      row.classList.add('is-open');
+      $('.dep-name', row).setAttribute('aria-expanded', 'true');
+      if (!reduced()) $$('.dep-row', dep).forEach((r) => { const dy = before.get(r) - r.getBoundingClientRect().top; if (dy) r.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }); });
+      return;
+    }
+    const st = e.target.closest('.dep-status');
+    if (!st || st.getAttribute('aria-disabled') === 'true' || flipping) return;
+    const t = board.task(id);
+    const next = order()[order().indexOf(t.section) + 1];
+    if (!next) return;
+    flipping = true;
+    st.dataset.s = next;
+    flapTo(st, sectionName(next), { done: () => {
+      flipping = false;
+      board.moveTo(id, next);
+      if (next === 'done') sayDone(t.title);
+      renderDepartures();
+    } });
+  });
+  board.on(() => { if (current === 'landing') renderDepartures(); });
+  renderDepartures();
+
+  // ---- reveals
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+    $$('[data-reveal]').forEach((el) => io.observe(el));
+  } else $$('[data-reveal]').forEach((el) => el.classList.add('is-in'));
+
+  // ---- scroll motion: the route photo drifts, the steps fill in word by word, statements rise line by line
+  $$('[data-scrub]').forEach((h) => { h.innerHTML = h.textContent.split(' ').map((w) => `<span class="word">${B.esc(w)}</span>`).join(' '); });
+  if (window.gsap && window.ScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+    const mm = gsap.matchMedia();
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.fromTo('.route-frame img', { scale: 1.14, yPercent: -4 }, { scale: 1, yPercent: 4, ease: 'none', scrollTrigger: { trigger: '.route', start: 'top bottom', end: 'bottom top', scrub: true } });
+      gsap.from('.route-frame', { clipPath: 'inset(0 0 100% 0)', duration: 1.1, ease: 'power3.inOut', scrollTrigger: { trigger: '.route-frame', start: 'top 80%' } });
+      $$('.step').forEach((s, i) => {
+        gsap.fromTo($$('.word', s), { opacity: 0.12 }, { opacity: 1, stagger: 0.12, ease: 'none', scrollTrigger: { trigger: s, start: 'top 85%', end: 'top 45%', scrub: true } });
+        gsap.from(s, { x: -40 - i * 10, ease: 'none', scrollTrigger: { trigger: s, start: 'top 95%', end: 'top 55%', scrub: true } });
+      });
+      $$('.field').forEach((f) => gsap.from($$('.ln > span', f), { yPercent: 105, stagger: 0.11, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: f, start: 'top 70%' } }));
+      gsap.from('.again h2 span', { yPercent: 40, opacity: 0, stagger: 0.1, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: '.again', start: 'top 70%' } });
+      gsap.fromTo('.foot-word', { xPercent: 6 }, { xPercent: -6, ease: 'none', scrollTrigger: { trigger: '.foot', start: 'top bottom', end: 'bottom bottom', scrub: true } });
+      gsap.from('.dep-row:not(.dep-ghost)', { opacity: 0, x: 30, stagger: 0.05, duration: 0.6, ease: 'power3.out', scrollTrigger: { trigger: '.dep-wrap', start: 'top 75%' } });
+    });
+  }
+})();
+</script>
