@@ -1,5 +1,5 @@
-# Asanaka API, imported by /etc/caddy/Caddyfile. Rendered from vps/asanaka.caddy.template at deploy time
-# with the host name and port from .local/deploy.local.json; installed once by host-setup.sh.
+# Asanaka API, installed as /opt/ttf/extra-sites/asanaka.caddy (imported by TaskTopFight's ttf.caddy). Rendered from vps/asanaka.caddy.template at deploy time
+# with the host name and port from .local/deploy.local.json; installed by site-sync.sh.
 {{API_HOST}} {
 	handle /api/* {
 		request_body {

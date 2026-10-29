@@ -3,7 +3,7 @@
 //   { "sshHost": "<ssh alias>", "apiHost": "<public API host name>", "apiPort": 7360, "allowedOrigins": "https://..." }
 //
 //   node vps/local.mjs deploy [--allow-dirty]   stage api/ and vps/, copy over SSH, rebuild and restart the api
-//   node vps/local.mjs host-setup               one time: Caddy site + restart (asks for your sudo password)
+//   node vps/local.mjs publish                  install or refresh the public HTTPS address (deploy does this too)
 //   node vps/local.mjs rotate-admin             new admin password, shown once
 //   node vps/local.mjs show-admin               show the current admin password
 //   node vps/local.mjs seed-users               create/update accounts from .secrets/users.local.json
@@ -53,7 +53,7 @@ switch (cmd) {
       writeFileSync(join(app, 'vps/Dockerfile.api'), lf('Dockerfile.api'));
       // tar and scp run inside the stage with relative paths: Git Bash's versions read "C:\..." as a remote host.
       run('tar', ['-czf', 'app.tgz', '-C', 'app', '.'], { cwd: stage });
-      for (const f of ['docker-compose.yml', 'asanaka', 'backup.sh', 'remote-deploy.sh', 'host-setup.sh']) writeFileSync(join(stage, 'vps', f), lf(f));
+      for (const f of ['docker-compose.yml', 'asanaka', 'backup.sh', 'remote-deploy.sh', 'site-sync.sh']) writeFileSync(join(stage, 'vps', f), lf(f));
       writeFileSync(join(stage, 'vps/asanaka.caddy'), lf('asanaka.caddy.template').replaceAll('{{API_HOST}}', cfg.apiHost).replaceAll('{{API_PORT}}', String(port)));
 
       console.log(`  deploying ${label} to ${host}`);
@@ -65,8 +65,8 @@ switch (cmd) {
     }
     break;
   }
-  case 'host-setup':
-    remote('bash ~/asanaka/host-setup.sh', { tty: true });
+  case 'publish':
+    remote('~/asanaka/site-sync.sh');
     break;
   case 'rotate-admin':
     remote('~/asanaka/asanaka admin-password --rotate');

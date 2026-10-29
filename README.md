@@ -36,7 +36,7 @@ The API and its database run in Docker on the VPS. Settings for reaching it live
 | Double-click | Does |
 | --- | --- |
 | `deploy-vps.bat` | Deploy the API (the database is never rebuilt) |
-| `host-setup.bat` | One time: put the API on its public HTTPS address (asks for your sudo password) |
+| `publish-api.bat` | Install or refresh the API's public HTTPS address (every deploy does this too) |
 | `rotate-admin-password.bat` | New admin password, shown once; `-Show` shows the current one |
 | `seed-users.bat` | Create or update the accounts in `.secrets/users.local.json` |
 

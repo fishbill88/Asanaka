@@ -81,14 +81,14 @@ vps/
   asanaka.caddy          the Caddy site
   asanaka                operator CLI on the box (status, logs, psql, backup, admin-password)
   remote-deploy.sh       runs on the box: unpack, build, restart, health check
-  local.mjs              runs here: deploy, host-setup, rotate-admin, seed-users, status, smoke
-  host-setup.sh          one-time: Caddy site + import, needs the operator's sudo password
+  local.mjs              runs here: deploy, publish, rotate-admin, seed-users, status, smoke
+  site-sync.sh           the Caddy site, through TaskTopFight's passwordless host helper
 designs/                 the three design prototypes (static HTML)
 .github/workflows/
   pages.yml              build web/ and deploy to Pages
   secrets-scan.yml       gitleaks on every push
 .githooks/pre-commit     refuses .env, .secrets/, .local/ and password-looking strings
-deploy-vps.bat · host-setup.bat · rotate-admin-password.bat · seed-users.bat   double-click helpers
+deploy-vps.bat · publish-api.bat · rotate-admin-password.bat · seed-users.bat   double-click helpers
 ```
 
 ## 5. Data model
@@ -176,10 +176,12 @@ Asanaka gets its own compose project in the operator's home directory, because t
 create folders under `/opt`. It has its own Postgres container and volume, and its API listens on
 127.0.0.1 only. Limits: api 0.5 CPU / 256 MB, db 512 MB. The other services on the box are left alone.
 
-One step needs the operator's sudo password, so the owner runs it, once:
-`vps\host-setup.bat` writes the Caddy site, adds its `import` line, validates and restarts Caddy.
-Caddy runs with its admin API off, so that restart is a ~1 second blip for **every** site on the box.
-Do it at a quiet hour.
+The public address needs no password. TaskTopFight's root-owned helper (`ttf-host-sync`, which the
+operator may run with sudo and no password) installs `/opt/ttf/ttf.caddy`, and that file imports
+`/opt/ttf/extra-sites/*.caddy`. Each deploy runs `site-sync.sh`: it checks Asanaka's site file parses,
+copies it into `extra-sites`, and runs the helper, which validates everything (rolling back on failure)
+and restarts Caddy only when something changed. Caddy runs with its admin API off, so that restart is a
+~1 second blip for **every** site on the box.
 
 Backups: nightly `pg_dump -Fc` from the operator's crontab, 14 kept. `asanaka backup` dumps on demand.
 
@@ -217,7 +219,7 @@ Each phase ends with something that can be checked.
 | 0 | Plan + three designs | Done 29 Oct 2026: design B picked, questions answered (§13) |
 | 1 | Repo scaffold: `web/`, `api/`, hooks, gitleaks, Pages workflow | **Done 29 Oct 2026.** Pages serves the app at the GitHub link; committing a fake `.env`, the real password or the server IP is refused |
 | 2 | API + schema, tested locally on PGlite | **Done 29 Oct 2026.** 23 tests: sign-in, lockout, sessions, board read, move ordering, complete/uncomplete, subtasks, comments, likes, sections |
-| 3 | VPS: compose, first deploy, Caddy (owner runs host-setup), seed users, password rotation, backups | **Done on the box 29 Oct 2026** (smoke passes on loopback; rotation verified; backups nightly). Left: the owner runs `host-setup.bat`, then `node vps/local.mjs smoke-public` |
+| 3 | VPS: compose, first deploy, Caddy site, seed users, password rotation, backups | **Done 29 Oct 2026.** Smoke passes on the box and through the public address; rotation verified; backups nightly |
 | 4 | Board UI: sections, cards, drag, composer, task pane, completion | Every v1 item in §2 works against the live API |
 | 5 | Landing + sign-in in the chosen design; production build on Pages | Signing in at the GitHub link as `ameerperalta` opens the board, end to end |
 | 6 | Realtime, sort, likes, activity | Two browsers see each other's moves within a second |

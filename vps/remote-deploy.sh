@@ -16,10 +16,10 @@ mkdir -p "$ROOT/releases" "$ROOT/backups"
 chmod 700 "$ROOT"
 
 # The compose file, the operator command and the scripts travel with each release.
-for f in docker-compose.yml asanaka backup.sh host-setup.sh asanaka.caddy; do
+for f in docker-compose.yml asanaka backup.sh site-sync.sh asanaka.caddy; do
   install -m 0644 "$IN/vps/$f" "$ROOT/$f"
 done
-chmod 0755 "$ROOT/asanaka" "$ROOT/backup.sh" "$ROOT/host-setup.sh"
+chmod 0755 "$ROOT/asanaka" "$ROOT/backup.sh" "$ROOT/site-sync.sh"
 
 # Secrets are made here, on the box, and never leave it.
 if [ ! -f "$ROOT/.env" ]; then
@@ -60,6 +60,9 @@ if ! crontab -l 2>/dev/null | grep -q 'asanaka/backup.sh'; then
   ( crontab -l 2>/dev/null; echo "17 19 * * * $ROOT/backup.sh >> $ROOT/backups/backup.log 2>&1" ) | crontab -
   echo "added the nightly backup to crontab"
 fi
+
+# The public HTTPS address, through TTF's passwordless host helper (restarts Caddy only on a change).
+"$ROOT/site-sync.sh" || echo "WARNING: the public address was not updated (see above); the api itself is running" >&2
 
 # Keep the last five releases.
 ls -1dt "$ROOT"/releases/*/ | tail -n +6 | xargs -r rm -rf

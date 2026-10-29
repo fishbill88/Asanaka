@@ -1,9 +1,9 @@
 @echo off
-REM One time: put the API on its public HTTPS address. Asks for your sudo password; restarts Caddy (~1 second for every site on the box).
+REM Install or refresh the API's public HTTPS address, with no password (every deploy does this too).
 REM Runs vps\local.mjs; settings come from .local\deploy.local.json (never committed).
 setlocal
 pushd "%~dp0"
-set "SUB=host-setup"
+set "SUB=publish"
 
 node vps\local.mjs %SUB%
 set "RC=%ERRORLEVEL%"
