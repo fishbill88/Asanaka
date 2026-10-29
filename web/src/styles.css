@@ -54,28 +54,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn--tone { background: var(--surface); color: var(--ink); }
 @media (hover: hover) and (pointer: fine) { .btn:hover { background: var(--accent-hover); } .btn--tone:hover { background: #a9d1e7; } }
 
-/* ---------- the front door (phase 5 replaces it with the full landing page) ---------- */
-.page { min-height: 100svh; display: grid; grid-template-rows: auto 1fr; padding-left: max(var(--margin), env(safe-area-inset-left, 0px)); padding-right: max(var(--margin), env(safe-area-inset-right, 0px)); overflow: hidden; }
-.nav { padding-top: max(28px, env(safe-area-inset-top, 0px)); position: relative; z-index: 2; }
-.wordmark { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; }
-.hero { position: relative; display: grid; align-items: start; padding-top: clamp(64px, 14vh, 150px); }
-.copy { position: relative; z-index: 2; max-width: 44rem; display: grid; gap: 22px; justify-items: start; }
-.copy h1 { font-size: var(--step-display); font-weight: 500; letter-spacing: -0.025em; line-height: 1.02; }
-.copy h1 span { display: block; }
-.copy p { max-width: 40ch; }
-.copy-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-
-/* The motif at its largest: a circle bigger than the screen, cropped by its edges. */
-.stage { position: fixed; z-index: 1; left: 38vw; top: 34vh; width: max(150vh, 104vw); aspect-ratio: 1; border-radius: 50%; background: var(--accent); }
-@media (prefers-reduced-motion: no-preference) {
-  .stage { clip-path: circle(0% at 30% 30%); animation: iris 1200ms var(--ease-in-out) 150ms forwards; }
-  .copy > * { opacity: 0; transform: translateY(18px); animation: rise 800ms var(--ease-out) forwards; }
-  .copy > :nth-child(2) { animation-delay: 90ms; }
-  .copy > :nth-child(3) { animation-delay: 180ms; }
-}
-@keyframes iris { to { clip-path: circle(75% at 30% 30%); } }
 @keyframes rise { to { opacity: 1; transform: none; } }
-
-@media (max-width: 700px) {
-  .stage { left: -20vw; top: 70svh; width: 140vw; }
-}

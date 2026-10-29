@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api, onAuthLost, setToken } from './lib/api';
+import { irisTo } from './lib/iris';
 import { navigate, useLocation } from './lib/router';
 import { clearSession, loadSession, saveSession } from './lib/session';
-import { Home } from './pages/Home';
+import { Landing } from './pages/Landing';
 import { SignIn } from './pages/SignIn';
 import { Workspace } from './pages/Workspace';
 import type { Session } from './types';
@@ -38,11 +39,14 @@ export function App() {
     return () => onAuthLost(null);
   }, []);
 
+  // Signing in: the sign-in page stays put until the iris covers it, then the board opens underneath.
+  const [leaving, setLeaving] = useState(false);
   const signedIn = (s: Session) => {
     saveSession(s);
     setToken(s.token);
     setSession(s);
-    navigate(safeNext(new URLSearchParams(search).get('next')), { replace: true });
+    setLeaving(true);
+    void irisTo(safeNext(new URLSearchParams(search).get('next')), { replace: true }).finally(() => setLeaving(false));
   };
 
   const signOut = async () => {
@@ -54,12 +58,12 @@ export function App() {
   };
 
   if (path === '/signin') {
-    return session ? <Redirect to={safeNext(new URLSearchParams(search).get('next'))} /> : <SignIn onSignedIn={signedIn} />;
+    return session && !leaving ? <Redirect to={safeNext(new URLSearchParams(search).get('next'))} /> : <SignIn onSignedIn={signedIn} username={new URLSearchParams(search).get('u') ?? ''} />;
   }
   const m = path!.match(BOARD);
   if (path === '/board' || m) {
     if (!session) return <Redirect to={`/signin?next=${encodeURIComponent(path!)}`} />;
     return <Workspace session={session} projectId={m?.[1] ?? null} taskId={m?.[2] ?? null} onSignOut={signOut} />;
   }
-  return <Home signedIn={!!session} />;
+  return <Landing signedIn={!!session} />;
 }

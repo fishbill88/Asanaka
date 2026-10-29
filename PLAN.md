@@ -229,7 +229,7 @@ Each phase ends with something that can be checked.
 | 2 | API + schema, tested locally on PGlite | **Done 29 Oct 2026.** 23 tests: sign-in, lockout, sessions, board read, move ordering, complete/uncomplete, subtasks, comments, likes, sections |
 | 3 | VPS: compose, first deploy, Caddy site, seed users, password rotation, backups | **Done 29 Oct 2026.** Smoke passes on the box and through the public address; rotation verified; backups nightly |
 | 4 | Board UI: sections, cards, drag, composer, task pane, completion | **Done 30 Oct 2026.** A 31-step browser drive (real mouse and keys) passes against the API on PGlite: sign-in, tick and untick, drags, Alt + arrows, composer, pane edits, sections, filters, deep links, phone. On the GitHub link, signed in as `ameerperalta` against the live API, an 11-step check passes in a throwaway project (archived after) |
-| 5 | Landing + sign-in in the chosen design; production build on Pages | Signing in at the GitHub link as `ameerperalta` opens the board, end to end |
+| 5 | Landing + sign-in in the chosen design; production build on Pages | **Built 30 Oct 2026.** Design B's landing page (live demo board on the stage, Where/Who/When plate, how a card moves, up close, "Sign in as ___ and go", the iris into sign-in and the board) passes the taste inspector at 1440/768/390 with no failures and a 10-step browser drive. Signing in at the GitHub link already worked in phase 4 |
 | 6 | Realtime, sort, likes, activity | Two browsers see each other's moves within a second |
 | 7 | Admin users page, accessibility and mobile pass, reduced motion | Keyboard-only drag works; the phone layout passes; admin can reset a password |
 

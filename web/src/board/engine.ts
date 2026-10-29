@@ -24,6 +24,8 @@ export interface Cheer { card: HTMLElement; task: Task; layer: HTMLElement; x: n
 export interface EngineOptions {
   board: Board;
   me: string;
+  /** The landing page's demo: columns and cards only (no header, section controls, composer or pane). */
+  compact?: boolean;
   actions: BoardActions;
   onOpen(id: string): void;
   /** A change was refused: report it and reload the board. */
@@ -117,8 +119,10 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   }
   load(o.board);
 
+  const compact = !!o.compact;
   root.classList.add('bd');
-  root.innerHTML = `
+  root.classList.toggle('bd-compact', compact);
+  root.innerHTML = `${compact ? '' : `
     <div class="bd-top">
       <div class="bd-proj">
         <h1 class="bd-proj-name"></h1>
@@ -132,7 +136,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
         </div>
         <button type="button" class="bd-primary" data-act="add-top">${ICON.plus}<span>Add task</span></button>
       </div>
-    </div>
+    </div>`}
     <div class="bd-scroll"><div class="bd-cols"></div></div>
     <div class="bd-layer" aria-hidden="true"></div>
     <div class="bd-menu" role="menu" hidden></div>
@@ -170,11 +174,11 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       <header class="bd-col-head">
         <h2 class="bd-col-name" id="${P}-h-${esc(s.id)}">${esc(s.name)}</h2>
         <span class="bd-col-count" aria-label="tasks">0</span>
-        <button type="button" class="bd-col-plus" aria-label="Add a task to the top of ${esc(s.name)}">${ICON.plus}</button>
-        <button type="button" class="bd-col-more" aria-label="More for ${esc(s.name)}" aria-haspopup="menu" aria-expanded="false">${ICON.more}</button>
+        ${compact ? '' : `<button type="button" class="bd-col-plus" aria-label="Add a task to the top of ${esc(s.name)}">${ICON.plus}</button>
+        <button type="button" class="bd-col-more" aria-label="More for ${esc(s.name)}" aria-haspopup="menu" aria-expanded="false">${ICON.more}</button>`}
       </header>
       <div class="bd-list"></div>
-      <button type="button" class="bd-add">${ICON.plus}<span>Add task</span></button>
+      ${compact ? '' : `<button type="button" class="bd-add">${ICON.plus}<span>Add task</span></button>`}
     </section>`;
 
   // ---- cards
@@ -222,9 +226,11 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   }
 
   function render() {
-    $('.bd-proj-name').textContent = project.name;
-    $('.bd-people').innerHTML = users.map((u) => avatar(u.id)).join('');
-    colsEl.innerHTML = sections.map(colHTML).join('') + NEWCOL;
+    if (!compact) {
+      $('.bd-proj-name').textContent = project.name;
+      $('.bd-people').innerHTML = users.map((u) => avatar(u.id)).join('');
+    }
+    colsEl.innerHTML = sections.map(colHTML).join('') + (compact ? '' : NEWCOL);
     for (const t of tasks.values()) if (t.sectionId) listOf(t.sectionId)?.append(makeCard(t));
     for (const c of allCards()) c.hidden = !matches(tasks.get(c.dataset.id!)!);
     counts(false);
@@ -437,7 +443,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       if (target.closest('button, a, input, textarea, select') || card.classList.contains('is-pending') || flying.has(card.dataset.id!)) return;
       kind = 'card';
       el = card;
-    } else if (head) {
+    } else if (head && !compact) {
       if (target.closest('button, input') || head.closest('.bd-col.is-pending')) return;
       kind = 'col';
       el = head.closest<HTMLElement>('.bd-col')!;
@@ -912,11 +918,11 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const nc = tgt.closest<HTMLElement>('.bd-newcol-btn');
     if (nc) { newSection(nc); return; }
     const card = tgt.closest<HTMLElement>('.bd-card');
-    if (card && !card.classList.contains('is-pending')) o.onOpen(card.dataset.id!);
+    if (card && !card.classList.contains('is-pending') && !compact) o.onOpen(card.dataset.id!);
   });
   listen(root, 'dblclick', (e) => {
     const h = (e.target as HTMLElement).closest('.bd-col-name');
-    if (h) renameSection(h.closest<HTMLElement>('.bd-col')!);
+    if (h && !compact) renameSection(h.closest<HTMLElement>('.bd-col')!);
   });
 
   // ---- for the React side

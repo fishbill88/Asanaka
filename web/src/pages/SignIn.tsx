@@ -4,8 +4,9 @@ import { follow, href } from '../lib/router';
 import type { Session } from '../types';
 
 // Design B's sign-in: the motif as a ball rising from the corner, the form on the sky.
-export function SignIn({ onSignedIn }: { onSignedIn(s: Session): void }) {
-  const [username, setUsername] = useState('');
+// `username` arrives from the landing page's "Sign in as ___ and go"; the password is the only thing left.
+export function SignIn({ onSignedIn, username: given = '' }: { onSignedIn(s: Session): void; username?: string }) {
+  const [username, setUsername] = useState(given);
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -16,8 +17,8 @@ export function SignIn({ onSignedIn }: { onSignedIn(s: Session): void }) {
 
   useEffect(() => {
     document.title = 'Sign in · Asanaka';
-    userRef.current?.focus();
-  }, []);
+    (given ? passRef : userRef).current?.focus();
+  }, [given]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
