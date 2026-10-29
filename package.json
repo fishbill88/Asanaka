@@ -1,0 +1,14 @@
+{
+  "name": "asanaka",
+  "private": true,
+  "description": "Asana-style kanban board: web/ is the site on GitHub Pages, api/ is the board API on the VPS.",
+  "workspaces": ["web", "api"],
+  "engines": { "node": ">=22.12" },
+  "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
+    "dev": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "test": "npm test -w api",
+    "check-secrets": "node scripts/check-secrets.mjs --all"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@asanaka/api",
+  "private": true,
+  "type": "module",
+  "description": "Asanaka board API: Fastify on Node 22 with its own Postgres. Runs in Docker on the VPS; see PLAN.md.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "fastify": "^5.12.7"
+  }
+}

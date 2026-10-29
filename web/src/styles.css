@@ -1,0 +1,57 @@
+@font-face { font-family: 'Roundo'; src: url('./fonts/roundo-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Roundo'; src: url('./fonts/roundo-500.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Roundo'; src: url('./fonts/roundo-600.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+
+/* Design B (Pin): sky and sand grounds, black ink, magenta for the motif and the action. */
+:root {
+  --bg: #cbe4f2;
+  --surface: #bcdcee;
+  --sand: #f1e3b5;
+  --sun: #ffc013;
+  --ink: #0a0a0a;
+  --muted: #3c5866;
+  --accent: #b0298f;
+  --accent-ink: #ffffff;
+  --font: 'Roundo', 'Avenir Next', 'Nunito', system-ui, sans-serif;
+  --step-body: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+  --step-display: clamp(44px, 5.2vw, 80px);
+  --margin: clamp(16px, 2.8vw, 40px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font-family: var(--font); font-size: var(--step-body); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+h1, p { margin: 0; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+.page { min-height: 100svh; display: grid; grid-template-rows: auto 1fr; padding-left: max(var(--margin), env(safe-area-inset-left, 0px)); padding-right: max(var(--margin), env(safe-area-inset-right, 0px)); overflow: hidden; }
+.nav { padding-top: max(28px, env(safe-area-inset-top, 0px)); position: relative; z-index: 2; }
+.wordmark { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 18px; }
+.dot { width: 0.5em; height: 0.5em; border-radius: 50%; background: var(--accent); }
+
+.hero { position: relative; display: grid; align-items: start; padding-top: clamp(64px, 14vh, 150px); }
+.copy { position: relative; z-index: 2; max-width: 44rem; display: grid; gap: 22px; justify-items: start; }
+.copy h1 { font-size: var(--step-display); font-weight: 500; letter-spacing: -0.025em; line-height: 1.02; }
+.copy h1 span { display: block; }
+.copy p { max-width: 40ch; }
+.btn { display: inline-flex; align-items: center; min-height: 52px; padding: 0 26px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-weight: 500; text-decoration: none; transition: transform 140ms var(--ease-out), background-color 180ms ease; }
+.btn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .btn:hover { background: #951f78; } }
+
+/* The motif at its largest: a circle bigger than the screen, cropped by its edges. */
+.stage { position: fixed; z-index: 1; left: 38vw; top: 34vh; width: max(150vh, 104vw); aspect-ratio: 1; border-radius: 50%; background: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .stage { clip-path: circle(0% at 30% 30%); animation: iris 1200ms var(--ease-in-out) 150ms forwards; }
+  .copy > * { opacity: 0; transform: translateY(18px); animation: rise 800ms var(--ease-out) forwards; }
+  .copy > :nth-child(2) { animation-delay: 90ms; }
+  .copy > :nth-child(3) { animation-delay: 180ms; }
+}
+@keyframes iris { to { clip-path: circle(75% at 30% 30%); } }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+@media (max-width: 700px) {
+  .stage { left: -20vw; top: 70svh; width: 140vw; }
+}

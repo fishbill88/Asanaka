@@ -1,0 +1,7 @@
+# Gitleaks (run in .github/workflows/checks.yml): the default rules, plus one exception.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fonts and images embedded as base64 data URIs are not secrets"
+regexes = ['''data:[a-z0-9.+/-]+;base64,[A-Za-z0-9+/=]+''']

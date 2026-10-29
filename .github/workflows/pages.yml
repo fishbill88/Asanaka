@@ -1,0 +1,47 @@
+# Builds web/ and publishes it to GitHub Pages: https://fishbill88.github.io/Asanaka/
+# The API's public origin comes from the repository variable ASANAKA_API_ORIGIN (Settings > Variables),
+# never from the code. Unset, the site builds without one.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'package.json', 'package-lock.json', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w web
+        env:
+          VITE_API_ORIGIN: ${{ vars.ASANAKA_API_ORIGIN }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

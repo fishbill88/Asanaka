@@ -1,0 +1,4 @@
+#!/bin/sh
+# Refuse commits that would publish a secret (see scripts/check-secrets.mjs).
+# Turned on by `npm install` (the root "prepare" script sets core.hooksPath to .githooks).
+exec node scripts/check-secrets.mjs
