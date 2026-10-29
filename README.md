@@ -28,6 +28,20 @@ npm test             # API tests
 npm run build        # production build into web/dist
 ```
 
+## The VPS
+
+The API and its database run in Docker on the VPS. Settings for reaching it live in the gitignored
+`.local/deploy.local.json`. From this PC:
+
+| Double-click | Does |
+| --- | --- |
+| `deploy-vps.bat` | Deploy the API (the database is never rebuilt) |
+| `host-setup.bat` | One time: put the API on its public HTTPS address (asks for your sudo password) |
+| `rotate-admin-password.bat` | New admin password, shown once; `-Show` shows the current one |
+| `seed-users.bat` | Create or update the accounts in `.secrets/users.local.json` |
+
+`node vps/local.mjs status`, `smoke` and `smoke-public` check it.
+
 ## Secrets stay local
 
 The repository is public. Passwords, the VPS address and server notes live only in gitignored

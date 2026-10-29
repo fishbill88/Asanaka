@@ -81,14 +81,14 @@ vps/
   asanaka.caddy          the Caddy site
   asanaka                operator CLI on the box (status, logs, psql, backup, admin-password)
   remote-deploy.sh       runs on the box: unpack, build, restart, health check
-  deploy.ps1             runs here: stage, copy over SSH, call remote-deploy.sh
+  local.mjs              runs here: deploy, host-setup, rotate-admin, seed-users, status, smoke
   host-setup.sh          one-time: Caddy site + import, needs the operator's sudo password
 designs/                 the three design prototypes (static HTML)
 .github/workflows/
   pages.yml              build web/ and deploy to Pages
   secrets-scan.yml       gitleaks on every push
 .githooks/pre-commit     refuses .env, .secrets/, .local/ and password-looking strings
-deploy-vps.bat · rotate-admin-password.bat · seed-users.ps1     double-click helpers
+deploy-vps.bat · host-setup.bat · rotate-admin-password.bat · seed-users.bat   double-click helpers
 ```
 
 ## 5. Data model
@@ -147,7 +147,7 @@ or on this PC's disk.
 - From this PC: `rotate-admin-password.bat` rotates now and shows the new password.
   `rotate-admin-password.bat -Show` shows the current one.
 
-**ameerperalta.** `seed-users.ps1` reads `.secrets/users.local.json` (gitignored) and sends each
+**ameerperalta.** `seed-users.bat` reads `.secrets/users.local.json` (gitignored) and sends each
 password over SSH **on stdin** to `tools/admin.mjs set-password`. The password never appears in the
 repo, in a command line (which `ps` would expose) or in shell history. That also sidesteps a trap with
 this particular password: `$$` inside a double-quoted shell string expands to a process id, and inside
@@ -188,7 +188,7 @@ Backups: nightly `pg_dump -Fc` from the operator's crontab, 14 kept. `asanaka ba
 - **Frontend:** push to `main`, and `pages.yml` builds `web/` with `ASANAKA_API_ORIGIN` and publishes
   it. Pages has no SPA fallback, so the build copies `index.html` to `404.html`. React Router runs with
   `basename="/Asanaka"`. A `<meta>` Content-Security-Policy limits scripts to our own files.
-- **API:** `deploy-vps.bat` → `vps/deploy.ps1` stages `api/` and `vps/`, copies them over SSH, and runs
+- **API:** `deploy-vps.bat` → `vps/local.mjs deploy` stages `api/` and `vps/`, copies them over SSH, and runs
   `remote-deploy.sh`. That script builds the image, starts db then api, waits for `/healthz`, and
   keeps the last five releases. Migrations apply themselves on start. The db container is never rebuilt.
 - **Smoke test:** `node api/tools/smoke.mjs <origin>` signs in, makes a project, adds, moves,
@@ -215,9 +215,9 @@ Each phase ends with something that can be checked.
 | # | Phase | Done when |
 | --- | --- | --- |
 | 0 | Plan + three designs | Done 29 Oct 2026: design B picked, questions answered (§13) |
-| 1 | Repo scaffold: `web/`, `api/`, hooks, gitleaks, Pages workflow | Pages serves the empty app at the GitHub link; a test commit of a fake `.env` is refused |
-| 2 | API + schema, tested locally on PGlite | `npm test` covers sign-in, lockout, board read, move ordering, complete/uncomplete |
-| 3 | VPS: compose, first deploy, Caddy (owner runs host-setup), seed users, password rotation, backups | `smoke.mjs` passes against the public API; `rotate-admin-password.bat` prints a new password and the old one stops working |
+| 1 | Repo scaffold: `web/`, `api/`, hooks, gitleaks, Pages workflow | **Done 29 Oct 2026.** Pages serves the app at the GitHub link; committing a fake `.env`, the real password or the server IP is refused |
+| 2 | API + schema, tested locally on PGlite | **Done 29 Oct 2026.** 23 tests: sign-in, lockout, sessions, board read, move ordering, complete/uncomplete, subtasks, comments, likes, sections |
+| 3 | VPS: compose, first deploy, Caddy (owner runs host-setup), seed users, password rotation, backups | **Done on the box 29 Oct 2026** (smoke passes on loopback; rotation verified; backups nightly). Left: the owner runs `host-setup.bat`, then `node vps/local.mjs smoke-public` |
 | 4 | Board UI: sections, cards, drag, composer, task pane, completion | Every v1 item in §2 works against the live API |
 | 5 | Landing + sign-in in the chosen design; production build on Pages | Signing in at the GitHub link as `ameerperalta` opens the board, end to end |
 | 6 | Realtime, sort, likes, activity | Two browsers see each other's moves within a second |
