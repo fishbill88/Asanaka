@@ -25,7 +25,7 @@ const taskOut = (r) => ({
   id: r.id, projectId: r.project_id, sectionId: r.section_id, parentId: r.parent_id,
   title: r.title, notes: r.notes, assigneeId: r.assignee_id, dueOn: r.due_on,
   priority: r.priority, status: r.status, completed: !!r.completed_at, completedAt: r.completed_at,
-  position: r.position, createdAt: r.created_at, updatedAt: r.updated_at,
+  previousSectionId: r.previous_section_id ?? null, position: r.position, createdAt: r.created_at, updatedAt: r.updated_at,
   subtaskCount: r.subtask_count ?? 0, subtaskDoneCount: r.subtask_done_count ?? 0,
   commentCount: r.comment_count ?? 0, likeCount: r.like_count ?? 0, liked: !!r.liked,
 });

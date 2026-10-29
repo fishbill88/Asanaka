@@ -1,20 +1,65 @@
-const PLAN_URL = 'https://github.com/fishbill88/Asanaka/blob/main/PLAN.md';
+import { useEffect, useState } from 'react';
+import { api, onAuthLost, setToken } from './lib/api';
+import { navigate, useLocation } from './lib/router';
+import { clearSession, loadSession, saveSession } from './lib/session';
+import { Home } from './pages/Home';
+import { SignIn } from './pages/SignIn';
+import { Workspace } from './pages/Workspace';
+import type { Session } from './types';
 
-// Phase 1 placeholder: the real landing page, sign-in and board arrive in phases 4 and 5.
+const BOARD = /^\/p\/([0-9a-f-]{36})(?:\/t\/([0-9a-f-]{36}))?\/?$/;
+
+// Only paths inside this app are followed after signing in.
+const safeNext = (next: string | null) => (next && next.startsWith('/') && !next.startsWith('//') ? next : '/board');
+
+function Redirect({ to }: { to: string }) {
+  useEffect(() => navigate(to, { replace: true }), [to]);
+  return null;
+}
+
 export function App() {
-  return (
-    <div className="page">
-      <header className="nav">
-        <span className="wordmark"><span className="dot" aria-hidden="true" />Asanaka</span>
-      </header>
-      <main className="hero">
-        <div className="copy">
-          <h1><span>Asa na ka?</span><span>Board coming soon.</span></h1>
-          <p>Cebuano for “where are you now?” Asanaka is a kanban board for a small team. This is its address; the board opens here once it’s built.</p>
-          <a className="btn" href={PLAN_URL}>Read the plan</a>
-        </div>
-        <div className="stage" aria-hidden="true" />
-      </main>
-    </div>
-  );
+  const loc = useLocation();
+  const [path, search = ''] = loc.split('?');
+  const [session, setSession] = useState<Session | null>(() => {
+    const s = loadSession();
+    setToken(s?.token ?? null);
+    return s;
+  });
+
+  // The API refused the token (expired, signed out elsewhere, password changed): back to sign-in, then here.
+  useEffect(() => {
+    onAuthLost(() => {
+      clearSession();
+      setToken(null);
+      setSession(null);
+      const here = location.pathname.replace(import.meta.env.BASE_URL.replace(/\/$/, ''), '') || '/';
+      navigate(`/signin?next=${encodeURIComponent(here)}`, { replace: true });
+    });
+    return () => onAuthLost(null);
+  }, []);
+
+  const signedIn = (s: Session) => {
+    saveSession(s);
+    setToken(s.token);
+    setSession(s);
+    navigate(safeNext(new URLSearchParams(search).get('next')), { replace: true });
+  };
+
+  const signOut = async () => {
+    await api.logout().catch(() => undefined);
+    clearSession();
+    setToken(null);
+    setSession(null);
+    navigate('/signin', { replace: true });
+  };
+
+  if (path === '/signin') {
+    return session ? <Redirect to={safeNext(new URLSearchParams(search).get('next'))} /> : <SignIn onSignedIn={signedIn} />;
+  }
+  const m = path!.match(BOARD);
+  if (path === '/board' || m) {
+    if (!session) return <Redirect to={`/signin?next=${encodeURIComponent(path!)}`} />;
+    return <Workspace session={session} projectId={m?.[1] ?? null} taskId={m?.[2] ?? null} onSignOut={signOut} />;
+  }
+  return <Home signedIn={!!session} />;
 }

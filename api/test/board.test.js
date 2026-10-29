@@ -62,6 +62,7 @@ test('ticking moves a task to the top of Done; unticking puts it back where it w
   let res = (await call('PATCH', `/api/tasks/${task.id}`, { completed: true })).body.task;
   assert.equal(res.completed, true);
   assert.equal(res.sectionId, sec.Done);
+  assert.equal(res.previousSectionId, sec.Doing);
   assert.equal(titlesIn(await board(), sec.Done)[0], 'Ship it');
   res = (await call('PATCH', `/api/tasks/${task.id}`, { completed: false })).body.task;
   assert.equal(res.completed, false);
