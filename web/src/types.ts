@@ -50,6 +50,7 @@ export interface Task {
   attachmentCount: number;
   likeCount: number;
   liked: boolean;
+  likerIds: string[];
 }
 
 export interface Board {
@@ -92,6 +93,14 @@ export interface TaskDetail {
   attachments: Attachment[];
   activity: Activity[];
 }
+
+// What the live stream sends (api/src/live.js): changes other people (or your other tabs) made.
+export type LiveEvent =
+  | { type: 'hello' }
+  | { type: 'task'; task: Omit<Task, 'liked'>; actorId: string }
+  | { type: 'task-removed'; id: string; actorId: string }
+  | { type: 'board'; actorId: string }
+  | { type: 'signed-out' };
 
 export interface Session {
   token: string;

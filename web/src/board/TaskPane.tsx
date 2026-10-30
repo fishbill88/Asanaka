@@ -19,13 +19,22 @@ interface Props {
   onFailure(err: unknown): void;
   /** Something to tell the visitor that needs no reload (a file too big, an upload that failed). */
   onNotice(message: string): void;
+  /** Bumped when someone else changed a task; the pane reloads its comments and activity if it's this one. */
+  remote: { id: string; n: number } | null;
 }
+
+type Feed = 'comments' | 'all';
+const FEED_KEY = 'asanaka.feed';
+const savedFeed = (): Feed => { try { return localStorage.getItem(FEED_KEY) === 'all' ? 'all' : 'comments'; } catch { return 'comments'; } };
 
 const Check = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 12.5l3.6 3.6 7.4-8.2" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
 const Close = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+);
+const Thumb = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 11v9h-3v-9h3zm0 9h9.2a2 2 0 0 0 2-1.6l1.2-6.1a2 2 0 0 0-2-2.3h-4.5l.8-3.6a1.8 1.8 0 0 0-3.3-1.4L7.5 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
 );
 const Clip = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.1-7.1a4 4 0 0 0-5.7-5.7l-7.1 7.1a6 6 0 0 0 8.5 8.5l5.3-5.3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -55,11 +64,20 @@ function describe(a: Activity, sectionName: (id: unknown) => string) {
   }
 }
 
+// The feed reads top to bottom, oldest first, so the newest sits by the comment box. "All activity" weaves
+// the changes in with the comments (a "commented" entry is the comment itself, so it isn't listed twice).
+type FeedItem = { kind: 'comment'; at: string; c: Comment } | { kind: 'event'; at: string; a: Activity };
+function feedOf(feed: Feed, comments: Comment[], activity: Activity[]): FeedItem[] {
+  const items: FeedItem[] = comments.map((c) => ({ kind: 'comment', at: c.createdAt, c }));
+  if (feed === 'all') for (const a of activity) if (a.kind !== 'commented') items.push({ kind: 'event', at: a.createdAt, a });
+  return items.sort((x, y) => (x.at < y.at ? -1 : x.at > y.at ? 1 : 0));
+}
+
 let tmp = 0;
 const tempId = () => `tmp-pane-${++tmp}`;
 const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
 
-export function TaskPane({ taskId, open, engine, board, sections, me, onClose, onClosed, onFailure, onNotice }: Props) {
+export function TaskPane({ taskId, open, engine, board, sections, me, onClose, onClosed, onFailure, onNotice, remote }: Props) {
   const pane = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -77,7 +95,10 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   const [uploading, setUploading] = useState(0);
   const [dropping, setDropping] = useState(false);
   const [viewing, setViewing] = useState<Attachment | null>(null);
+  const [feed, setFeedState] = useState<Feed>(savedFeed);
+  const likeRef = useRef<HTMLButtonElement>(null);
   const t = task ?? detail?.task;
+  const setFeed = (v: Feed) => { setFeedState(v); try { localStorage.setItem(FEED_KEY, v); } catch { /* lasts this visit */ } };
   const setNotes = useCallback((v: string) => { notesLive.current = v; setNotesState(v); }, []);
 
   // Slide in on the next frame (so the closed position is painted first); slide out, then unmount.
@@ -157,9 +178,16 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     const n = ++refreshing.current;
     after.then(() => new Promise((r) => setTimeout(r, 300))).then(() => {
       if (n !== refreshing.current) return;
-      return load().then((d) => { if (n === refreshing.current) setDetail((cur) => (cur ? { ...cur, activity: d.activity } : d)); });
+      // Everything is replaced unless a comment or subtask of ours is still on its way; then only the activity.
+      return load().then((d) => {
+        if (n !== refreshing.current) return;
+        setDetail((cur) => (!cur ? d : [...cur.comments, ...cur.subtasks].some((x) => x.id.startsWith('tmp-')) ? { ...cur, activity: d.activity } : d));
+      });
     }).catch(() => undefined);
   }, [load]);
+
+  // Someone else changed this task: fetch its comments, subtasks, files and activity again.
+  useEffect(() => { if (remote?.id === taskId) refreshSoon(Promise.resolve()); }, [remote, taskId, refreshSoon]);
 
   const saveFields = useCallback((fields: TaskFields) => {
     engine.patch(taskId, fields as Partial<Task>);
@@ -189,7 +217,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
       setUploading((n) => n + 1);
       const req = uploadAttachment(taskId, file);
       req.then((a) => {
-        setDetail((d) => d && { ...d, attachments: [...d.attachments, a] });
+        setDetail((d) => d && { ...d, attachments: d.attachments.some((x) => x.id === a.id) ? d.attachments : [...d.attachments, a] });
         countFiles(1);
         if (into) replaceInNotes(tokens[i]!, markerFor(a));
       }, (err) => {
@@ -266,6 +294,17 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     refreshSoon(req);
   };
 
+  const toggleLike = () => {
+    const on = !t.liked;
+    const likerIds = on ? [...t.likerIds.filter((x) => x !== me), me] : t.likerIds.filter((x) => x !== me);
+    engine.patch(taskId, { liked: on, likeCount: likerIds.length, likerIds });
+    engine.save(taskId, api.like(taskId, on).then((r) => r.task));
+    if (on && !reduced()) likeRef.current?.querySelector('svg')?.animate(
+      [{ transform: 'scale(1)' }, { transform: 'scale(1.35) rotate(-12deg)' }, { transform: 'scale(1)' }], { duration: 360, easing: EASE_OUT });
+  };
+  const likers = t.likerIds.map((id) => (id === me ? 'you' : userName(id)));
+  const likedBy = likers.length ? `Liked by ${list(likers)}` : 'No likes yet';
+
   const deleteTask = () => {
     engine.remove(taskId);
     api.deleteTask(taskId).catch(onFailure);
@@ -328,7 +367,12 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
         <button type="button" className="pane-complete" aria-pressed={t.completed} onClick={() => engine.toggle(taskId)}>
           <Check /><span>{t.completed ? 'Completed' : 'Mark complete'}</span>
         </button>
-        <button type="button" className="pane-close" aria-label="Close task details" onClick={onClose}><Close /></button>
+        <div className="pane-bar-end">
+          <button type="button" ref={likeRef} className="pane-like" aria-pressed={t.liked} aria-label={`Like. ${likedBy}.`} title={likedBy} onClick={toggleLike}>
+            <Thumb />{t.likeCount > 0 && <span>{t.likeCount}</span>}
+          </button>
+          <button type="button" className="pane-close" aria-label="Close task details" onClick={onClose}><Close /></button>
+        </div>
       </div>
 
       <div className="pane-scroll">
@@ -428,33 +472,33 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
         </div>
 
         <div className="pane-block">
-          <h2 className="pane-h">Comments</h2>
+          <div className="pane-h-row">
+            <h2 className="pane-h" id="pane-feed-h">{feed === 'comments' ? 'Comments' : 'Activity'}</h2>
+            <div className="pane-seg" role="radiogroup" aria-label="Show">
+              <button type="button" role="radio" aria-checked={feed === 'comments'} onClick={() => setFeed('comments')}>Comments</button>
+              <button type="button" role="radio" aria-checked={feed === 'all'} onClick={() => setFeed('all')}>All activity</button>
+            </div>
+          </div>
           {!detail ? <p className="pane-empty">{t.commentCount ? 'Loading comments…' : 'No comments yet.'}</p> : (
-            <ul className="pane-comments">
-              {comments.length === 0 && <li className="pane-empty">No comments yet.</li>}
-              {comments.map((c) => (
-                <li key={c.id} className="pane-comment">
-                  <Avatar board={board} id={c.authorId} />
+            <ol className="pane-feed" aria-labelledby="pane-feed-h">
+              {feedOf(feed, comments, detail.activity).map((item) => item.kind === 'comment' ? (
+                <li key={`c-${item.c.id}`} className="pane-comment">
+                  <Avatar board={board} id={item.c.authorId} />
                   <div>
-                    <p className="pane-comment-by"><strong>{userName(c.authorId)}</strong> <span>{when(c.createdAt)}</span></p>
-                    <p className="pane-comment-body">{c.body}</p>
+                    <p className="pane-comment-by"><strong>{userName(item.c.authorId)}</strong> <span>{when(item.c.createdAt)}</span></p>
+                    <p className="pane-comment-body">{item.c.body}</p>
                   </div>
                 </li>
+              ) : (
+                <li key={`a-${item.a.id}`} className="pane-event">
+                  <span className="pane-event-dot" aria-hidden="true" />
+                  <p><strong>{userName(item.a.actorId)}</strong> {describe(item.a, sectionName)} <span>{when(item.a.createdAt)}</span></p>
+                </li>
               ))}
-            </ul>
+              {feed === 'comments' && comments.length === 0 && <li className="pane-empty">No comments yet.</li>}
+            </ol>
           )}
         </div>
-
-        {detail && detail.activity.length > 0 && (
-          <div className="pane-block">
-            <h2 className="pane-h">Activity</h2>
-            <ol className="pane-activity">
-              {detail.activity.slice(0, 12).map((a) => (
-                <li key={a.id}><strong>{userName(a.actorId)}</strong> {describe(a, sectionName)} <span>{when(a.createdAt)}</span></li>
-              ))}
-            </ol>
-          </div>
-        )}
 
         <div className="pane-block pane-danger">
           {confirmDelete ? (

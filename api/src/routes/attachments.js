@@ -39,7 +39,7 @@ async function liveAttachment(q, id) {
 const log = (q, projectId, taskId, actorId, kind, data) =>
   q.query('INSERT INTO activity (project_id, task_id, actor_id, kind, data) VALUES ($1, $2, $3, $4, $5)', [projectId, taskId, actorId, kind, JSON.stringify(data)]);
 
-export default function attachmentRoutes(app, { db }) {
+export default function attachmentRoutes(app, { db, live }) {
   app.post('/api/tasks/:id/attachments', {
     bodyLimit: MAX_FILE,
     schema: {
@@ -61,8 +61,9 @@ export default function attachmentRoutes(app, { db }) {
         `INSERT INTO attachments (task_id, uploader_id, filename, content_type, size, data) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${ATTACHMENT_COLS}`,
         [task.id, req.user.id, name, type, req.body.length, req.body])).rows[0];
       await log(t, task.project_id, task.id, req.user.id, 'attached', { attachmentId: a.id, name });
-      return a;
+      return { ...a, project_id: task.project_id };
     });
+    await live.task(req, row.project_id, row.task_id);
     return reply.code(201).send({ attachment: attachmentOut(row) });
   });
 
@@ -83,6 +84,9 @@ export default function attachmentRoutes(app, { db }) {
     const a = await liveAttachment(t, req.params.id);
     await t.query('DELETE FROM attachments WHERE id = $1', [a.id]);
     await log(t, a.project_id, a.task_id, req.user.id, 'attachment-removed', { name: a.filename });
+    return a;
+  }).then(async (a) => {
+    await live.task(req, a.project_id, a.task_id);
     return { ok: true };
   }));
 }

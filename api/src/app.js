@@ -3,17 +3,18 @@ import cors from '@fastify/cors';
 import { HttpError } from './errors.js';
 import attachmentRoutes, { MAX_FILE } from './routes/attachments.js';
 import authRoutes from './routes/auth.js';
-import boardRoutes from './routes/board.js';
+import boardRoutes, { readTask } from './routes/board.js';
+import liveRoutes, { createHub, publisher } from './live.js';
 
 // Builds the app without listening, so tests can drive it with inject(). `db` is the adapter from db.js.
-export function buildApp({ db, config, logger = false }) {
+export function buildApp({ db, config, logger = false, hub = createHub() }) {
   const app = Fastify({ logger, trustProxy: config.trustProxy, bodyLimit: 1024 * 1024 });
 
   // Only the site itself may call the API from a browser.
   app.register(cors, {
     origin: config.allowedOrigins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Asanaka-Client'],
     exposedHeaders: ['Content-Disposition'],
     maxAge: 600,
   });
@@ -48,9 +49,10 @@ export function buildApp({ db, config, logger = false }) {
     return { ok: true };
   });
 
-  const ctx = { db, config };
+  const ctx = { db, config, hub, live: publisher(hub, (id) => readTask(db, id)) };
   authRoutes(app, ctx);
   boardRoutes(app, ctx);
   attachmentRoutes(app, ctx);
+  liveRoutes(app, ctx);
   return app;
 }

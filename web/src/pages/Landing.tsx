@@ -24,7 +24,7 @@ function demoBoard(): Board {
   const t = (id: string, sectionId: string, title: string, o: Partial<Task> = {}): Task => ({
     id, projectId: 'demo', sectionId, parentId: null, title, notes: '', assigneeId: null, dueOn: null, priority: null, status: null,
     completed: sectionId === 'done', completedAt: null, previousSectionId: null, position: id, createdAt: '', updatedAt: '',
-    subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, attachmentCount: 0, likeCount: 0, liked: false, ...o,
+    subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, attachmentCount: 0, likeCount: 0, liked: false, likerIds: [], ...o,
   });
   return {
     project: { id: 'demo', name: 'Demo', color: '#b0298f', position: 'a0', doneSectionId: 'done', createdAt: '' },

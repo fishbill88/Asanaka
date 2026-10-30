@@ -21,6 +21,7 @@ const COUNT_COLS = `
   (SELECT count(*) FROM comments c WHERE c.task_id = t.id)::int AS comment_count,
   (SELECT count(*) FROM attachments a WHERE a.task_id = t.id)::int AS attachment_count,
   (SELECT count(*) FROM task_likes l WHERE l.task_id = t.id)::int AS like_count,
+  ARRAY(SELECT l.user_id::text FROM task_likes l WHERE l.task_id = t.id ORDER BY l.user_id) AS liker_ids,
   EXISTS (SELECT 1 FROM task_likes l WHERE l.task_id = t.id AND l.user_id = $2) AS liked`;
 
 const taskOut = (r) => ({
@@ -30,6 +31,7 @@ const taskOut = (r) => ({
   previousSectionId: r.previous_section_id ?? null, position: r.position, createdAt: r.created_at, updatedAt: r.updated_at,
   subtaskCount: r.subtask_count ?? 0, subtaskDoneCount: r.subtask_done_count ?? 0,
   commentCount: r.comment_count ?? 0, attachmentCount: r.attachment_count ?? 0, likeCount: r.like_count ?? 0, liked: !!r.liked,
+  likerIds: r.liker_ids ?? [],
 });
 const sectionOut = (r) => ({ id: r.id, projectId: r.project_id, name: r.name, position: r.position });
 const projectOut = (r) => ({ id: r.id, name: r.name, color: r.color, position: r.position, doneSectionId: r.done_section_id, createdAt: r.created_at });
@@ -63,6 +65,8 @@ async function loadTask(q, id, lock = false) {
 async function taskWithCounts(q, id, userId) {
   return taskOut((await q.query(`SELECT ${TASK_COLS}, ${COUNT_COLS} FROM tasks t WHERE t.id = $1`, [id, userId])).rows[0]);
 }
+// A task as everyone sees it, for live updates (no one's "liked").
+export const readTask = (q, id) => taskWithCounts(q, id, NONE);
 async function assertUser(q, id) {
   if (id && !(await q.query('SELECT 1 FROM users WHERE id = $1 AND NOT disabled', [id])).rows[0]) {
     throw new HttpError(400, 'unknown-user', 'That person isn’t on Asanaka. Pick someone from the list.');
@@ -81,7 +85,7 @@ async function createProjectWithSections(q, { name: projectName, color, userId }
   return (await q.query('UPDATE projects SET done_section_id = $2 WHERE id = $1 RETURNING *', [p.id, ids[3]])).rows[0];
 }
 
-export default function boardRoutes(app, { db }) {
+export default function boardRoutes(app, { db, live }) {
   // ---- people
   app.get('/api/users', async () => ({ users: (await db.query('SELECT * FROM users WHERE NOT disabled ORDER BY display_name')).rows.map(publicUser) }));
 
@@ -114,11 +118,12 @@ export default function boardRoutes(app, { db }) {
       `UPDATE projects SET name = $2, color = $3, position = $4, done_section_id = $5 WHERE id = $1 RETURNING *`,
       [p.id, b.name?.trim() ?? p.name, b.color ?? p.color, position, b.doneSectionId !== undefined ? b.doneSectionId : p.done_section_id])).rows[0];
     return { project: projectOut(row) };
-  }));
+  }).then((r) => { live.board(req, r.project.id); return r; }));
 
   app.delete('/api/projects/:id', { schema: { params: idParams } }, async (req) => {
     const p = (await db.query('UPDATE projects SET archived_at = now() WHERE id = $1 AND archived_at IS NULL RETURNING id', [req.params.id])).rows[0];
     if (!p) throw notFound('project');
+    live.board(req, p.id);
     return { ok: true };
   });
 
@@ -139,9 +144,8 @@ export default function boardRoutes(app, { db }) {
   }, async (req, reply) => db.tx(async (t) => {
     const p = await loadProject(t, req.params.id, true);
     const key = await keyAt(t, { list: sectionsOf(t, p.id), rename: rename(t, 'sections'), index: req.body.index });
-    const s = (await t.query('INSERT INTO sections (project_id, name, position) VALUES ($1, $2, $3) RETURNING *', [p.id, req.body.name.trim(), key])).rows[0];
-    return reply.code(201).send({ section: sectionOut(s) });
-  }));
+    return (await t.query('INSERT INTO sections (project_id, name, position) VALUES ($1, $2, $3) RETURNING *', [p.id, req.body.name.trim(), key])).rows[0];
+  }).then((s) => { live.board(req, s.project_id); return reply.code(201).send({ section: sectionOut(s) }); }));
 
   app.patch('/api/sections/:id', {
     schema: { params: idParams, body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { name, index } } },
@@ -153,7 +157,7 @@ export default function boardRoutes(app, { db }) {
       : s.position;
     const row = (await t.query('UPDATE sections SET name = $2, position = $3 WHERE id = $1 RETURNING *', [s.id, req.body.name?.trim() ?? s.name, position])).rows[0];
     return { section: sectionOut(row) };
-  }));
+  }).then((r) => { live.board(req, r.section.projectId); return r; }));
 
   // Deleting a section keeps its tasks: they move to the end of the first remaining section.
   app.delete('/api/sections/:id', { schema: { params: idParams } }, async (req) => db.tx(async (t) => {
@@ -169,8 +173,8 @@ export default function boardRoutes(app, { db }) {
     }
     await t.query('UPDATE projects SET done_section_id = NULL WHERE done_section_id = $1', [s.id]);
     await t.query('DELETE FROM sections WHERE id = $1', [s.id]);
-    return { ok: true, movedTasks: moving.length, movedTo: target };
-  }));
+    return { projectId: s.project_id, out: { ok: true, movedTasks: moving.length, movedTo: target } };
+  }).then(({ projectId, out }) => { live.board(req, projectId); return out; }));
 
   // ---- tasks
   const taskFields = {
@@ -199,7 +203,9 @@ export default function boardRoutes(app, { db }) {
       await log(t, p.id, row.id, req.user.id, 'created', { sectionId: s.id });
       return row.id;
     });
-    return reply.code(201).send({ task: await taskWithCounts(db, id, req.user.id) });
+    const task = await taskWithCounts(db, id, req.user.id);
+    await live.task(req, task.projectId, id);
+    return reply.code(201).send({ task });
   });
 
   // One endpoint for every change to a task, including a drag (sectionId and/or index) and ticking it.
@@ -211,7 +217,7 @@ export default function boardRoutes(app, { db }) {
       body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { ...taskFields, completed: { type: 'boolean' }, sectionId: uuid, index } },
     },
   }, async (req) => {
-    await db.tx(async (t) => {
+    const changed = await db.tx(async (t) => {
       const task = await loadTask(t, req.params.id, true);
       const p = await loadProject(t, task.project_id);
       const b = req.body;
@@ -278,7 +284,10 @@ export default function boardRoutes(app, { db }) {
       if (done !== wasDone) await log(t, p.id, task.id, req.user.id, done ? 'completed' : 'reopened');
       const edited = ['title', 'notes', 'assigneeId', 'dueOn', 'priority', 'status'].filter((k) => b[k] !== undefined);
       if (edited.length) await log(t, p.id, task.id, req.user.id, 'edited', { fields: edited });
+      return { projectId: p.id, cardId: task.parent_id ?? task.id };
     });
+    // A subtask isn't a card; its parent's counts are what changed on the board.
+    await live.task(req, changed.projectId, changed.cardId);
     return { task: await taskWithCounts(db, req.params.id, req.user.id) };
   });
 
@@ -303,6 +312,10 @@ export default function boardRoutes(app, { db }) {
     const task = await loadTask(t, req.params.id, true);
     await t.query('UPDATE tasks SET deleted_at = now() WHERE id = $1 OR parent_id = $1', [task.id]);
     await log(t, task.project_id, task.id, req.user.id, 'deleted');
+    return task;
+  }).then(async (task) => {
+    if (task.parent_id) await live.task(req, task.project_id, task.parent_id);
+    else live.removed(req, task.project_id, task.id);
     return { ok: true };
   }));
 
@@ -318,8 +331,8 @@ export default function boardRoutes(app, { db }) {
         `INSERT INTO tasks (project_id, parent_id, title, assignee_id, position, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
         [parent.project_id, parent.id, req.body.title.trim(), req.body.assigneeId ?? null, key, req.user.id])).rows[0];
       await log(t, parent.project_id, parent.id, req.user.id, 'subtask-added', { subtaskId: row.id });
-      return row.id;
-    });
+      return { sub: row.id, parent };
+    }).then(async ({ sub, parent }) => { await live.task(req, parent.project_id, parent.id); return sub; });
     return reply.code(201).send({ task: await taskWithCounts(db, id, req.user.id) });
   });
 
@@ -329,17 +342,22 @@ export default function boardRoutes(app, { db }) {
     const task = await loadTask(t, req.params.id);
     const c = (await t.query('INSERT INTO comments (task_id, author_id, body) VALUES ($1, $2, $3) RETURNING *', [task.id, req.user.id, req.body.body.trim()])).rows[0];
     await log(t, task.project_id, task.id, req.user.id, 'commented', { commentId: c.id });
+    return { c, task };
+  }).then(async ({ c, task }) => {
+    await live.task(req, task.project_id, task.parent_id ?? task.id);
     return reply.code(201).send({ comment: { id: c.id, body: c.body, authorId: c.author_id, createdAt: c.created_at, editedAt: null } });
   }));
 
   app.put('/api/tasks/:id/like', { schema: { params: idParams } }, async (req) => {
-    await loadTask(db, req.params.id);
-    await db.query('INSERT INTO task_likes (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.params.id, req.user.id]);
-    return { task: await taskWithCounts(db, req.params.id, req.user.id) };
+    const task = await loadTask(db, req.params.id);
+    await db.query('INSERT INTO task_likes (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [task.id, req.user.id]);
+    await live.task(req, task.project_id, task.parent_id ?? task.id);
+    return { task: await taskWithCounts(db, task.id, req.user.id) };
   });
   app.delete('/api/tasks/:id/like', { schema: { params: idParams } }, async (req) => {
-    await loadTask(db, req.params.id);
-    await db.query('DELETE FROM task_likes WHERE task_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
-    return { task: await taskWithCounts(db, req.params.id, req.user.id) };
+    const task = await loadTask(db, req.params.id);
+    await db.query('DELETE FROM task_likes WHERE task_id = $1 AND user_id = $2', [task.id, req.user.id]);
+    await live.task(req, task.project_id, task.parent_id ?? task.id);
+    return { task: await taskWithCounts(db, task.id, req.user.id) };
   });
 }

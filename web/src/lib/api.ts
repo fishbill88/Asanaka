@@ -14,10 +14,16 @@ export class ApiError extends Error {
 let token: string | null = null;
 let authLost: (() => void) | null = null;
 export const setToken = (t: string | null) => { token = t; };
+export const authToken = () => token;
+export const apiBase = ORIGIN;
+export const signalAuthLost = () => authLost?.();
+
+// Names this tab to the API, so the live stream doesn't send the tab its own changes back.
+export const CLIENT_ID = `tab-${[...crypto.getRandomValues(new Uint32Array(3))].map((n) => n.toString(36)).join('')}`;
 export const onAuthLost = (fn: (() => void) | null) => { authLost = fn; };
 
 async function request<T>(method: string, path: string, body?: unknown, file?: Blob): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'X-Asanaka-Client': CLIENT_ID };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (file) headers['Content-Type'] = 'application/octet-stream';
   else if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -66,6 +72,7 @@ export const api = {
   deleteTask: (id: string) => write<{ ok: true }>('DELETE', `/api/tasks/${id}`),
   addSubtask: (id: string, title: string) => write<{ task: Task }>('POST', `/api/tasks/${id}/subtasks`, { title }),
   addComment: (id: string, body: string) => write<{ comment: Comment }>('POST', `/api/tasks/${id}/comments`, { body }),
+  like: (id: string, on: boolean) => write<{ task: Task }>(on ? 'PUT' : 'DELETE', `/api/tasks/${id}/like`),
 };
 
 // ---- attachments

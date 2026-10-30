@@ -5,9 +5,12 @@ import { EASE_IN_OUT, EASE_OUT, flip, reduced } from './motion';
 /* The board: columns and cards, moved by pointer, touch (long press) and keyboard (Alt + arrows). The other
    cards make room with FLIP, a ticked card flies to Done along an arc, sections are added, renamed, moved and
    deleted in place. Every change shows at once and is then sent to the API through `actions`; if the API
-   refuses one, the caller reloads the board from the server. The task pane is React's (TaskPane.tsx). */
+   refuses one, the caller reloads the board from the server. Changes other people make arrive through
+   `remoteTask` and `remoteRemove` and glide into place the same way. The task pane is React's (TaskPane.tsx). */
 
 export type Filter = 'all' | 'mine' | 'week';
+export type SortKey = 'manual' | 'due' | 'likes' | 'alpha' | 'assignee' | 'created';
+export const SORTS: Record<SortKey, string> = { manual: 'Manual', due: 'Due date', likes: 'Likes', alpha: 'Alphabetical', assignee: 'Assignee', created: 'Newest first' };
 
 export interface BoardActions {
   moveTask(id: string, sectionId: string, index: number): Promise<Task>;
@@ -33,6 +36,9 @@ export interface EngineOptions {
   /** The board and the server disagree about where something is: reload quietly. */
   onStale(): void;
   onSections?(sections: Section[]): void;
+  /** How cards are ordered inside each section; the caller remembers the choice. */
+  sort?: SortKey;
+  onSort?(sort: SortKey): void;
   celebrate?(c: Cheer): void;
   onLand?(c: { card: HTMLElement; layer: HTMLElement }): void;
 }
@@ -49,6 +55,9 @@ export interface BoardEngine {
   moveTo(id: string, sectionId: string): void;
   subscribe(fn: (t: Task) => void): () => void;
   replace(board: Board): void;
+  /** A task changed or appeared because someone else (or another tab) changed it. */
+  remoteTask(task: Omit<Task, 'liked'>, actorId: string): void;
+  remoteRemove(id: string, actorId: string): void;
   isDragging(): boolean;
   focusCard(id: string): void;
   destroy(): void;
@@ -61,7 +70,10 @@ const ICON = {
   subtasks: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v10a3 3 0 0 0 3 3h6M6 9h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="9" r="2.2" fill="currentColor"/><circle cx="18" cy="17" r="2.2" fill="currentColor"/></svg>',
   comment: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H10l-4 4v-4H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
   clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.1-7.1a4 4 0 0 0-5.7-5.7l-7.1 7.1a6 6 0 0 0 8.5 8.5l5.3-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  thumb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 11v9h-3v-9h3zm0 9h9.2a2 2 0 0 0 2-1.6l1.2-6.1a2 2 0 0 0-2-2.3h-4.5l.8-3.6a1.8 1.8 0 0 0-3.3-1.4L7.5 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sort: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M3.5 15.5L7 19l3.5-3.5M17 19V5M13.5 8.5L17 5l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 let seq = 0;
@@ -107,7 +119,12 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   let filter: Filter = 'all';
   let current: string | null = null;
   let lastDragEnd = 0;
-  let queued: Board | null = null;
+  let reloadWanted = false;
+  let renaming = false;
+  let composer: { box: HTMLElement; ta: HTMLTextAreaElement; list: HTMLElement; col: HTMLElement; where: 'top' | 'bottom' } | null = null;
+  let sort: SortKey = o.sort && o.sort in SORTS ? o.sort : 'manual';
+  const inbox: (() => void)[] = []; // other people's changes that arrived mid-drag, applied on drop
+  const staleAfter = new Set<string>(); // tasks someone else changed while a save of ours was on its way
   const P = uid('b');
 
   function load(b: Board) {
@@ -134,6 +151,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
           <button type="button" class="bd-filter" data-filter="mine" aria-pressed="false">My tasks</button>
           <button type="button" class="bd-filter" data-filter="week" aria-pressed="false">Due this week</button>
         </div>
+        <button type="button" class="bd-sort" aria-haspopup="menu" aria-expanded="false">${ICON.sort}<span class="bd-sort-value">Sort</span></button>
         <button type="button" class="bd-primary" data-act="add-top">${ICON.plus}<span>Add task</span></button>
       </div>
     </div>`}
@@ -190,7 +208,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const counts =
       (t.subtaskCount ? `<span class="bd-count" title="Subtasks done">${ICON.subtasks}${t.subtaskDoneCount}/${t.subtaskCount}</span>` : '') +
       (t.commentCount ? `<span class="bd-count" title="Comments">${ICON.comment}${t.commentCount}</span>` : '') +
-      (t.attachmentCount ? `<span class="bd-count" title="Attachments">${ICON.clip}${t.attachmentCount}</span>` : '');
+      (t.attachmentCount ? `<span class="bd-count" title="Attachments">${ICON.clip}${t.attachmentCount}</span>` : '') +
+      (t.likeCount ? `<span class="bd-count${t.liked ? ' is-mine' : ''}" title="${t.liked ? 'You like this' : 'Likes'}">${ICON.thumb}${t.likeCount}</span>` : '');
     const foot = t.assigneeId || d || counts
       ? `<div class="bd-foot">${avatar(t.assigneeId)}${d ? `<span class="bd-due" data-state="${d.state}">${d.label}</span>` : ''}${counts ? `<span class="bd-counts">${counts}</span>` : ''}</div>`
       : '';
@@ -233,9 +252,75 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     colsEl.innerHTML = sections.map(colHTML).join('') + (compact ? '' : NEWCOL);
     for (const t of tasks.values()) if (t.sectionId) listOf(t.sectionId)?.append(makeCard(t));
     for (const c of allCards()) c.hidden = !matches(tasks.get(c.dataset.id!)!);
+    if (sort !== 'manual') arrange(undefined, false);
+    showSort();
     counts(false);
     sectionsChanged();
   }
+
+  // ---- sort: Manual keeps the order people dragged; the others order each section by a field.
+  const byPosition = (a: Task, b: Task) => (a.position < b.position ? -1 : a.position > b.position ? 1 : 0);
+  function compare(a: Task, b: Task) {
+    let d = 0;
+    if (sort === 'due') d = a.dueOn === b.dueOn ? 0 : !a.dueOn ? 1 : !b.dueOn ? -1 : a.dueOn < b.dueOn ? -1 : 1;
+    else if (sort === 'likes') d = b.likeCount - a.likeCount;
+    else if (sort === 'alpha') d = collator.compare(a.title, b.title);
+    else if (sort === 'assignee') {
+      const x = nameOf(a.assigneeId), y = nameOf(b.assigneeId);
+      d = x === y ? 0 : !x ? 1 : !y ? -1 : collator.compare(x, y);
+    } else if (sort === 'created') d = a.createdAt === b.createdAt ? 0 : a.createdAt < b.createdAt ? 1 : -1;
+    return d || byPosition(a, b);
+  }
+  // Where a task belongs in a list: before the first settled card that sorts after it.
+  function slotFor(list: HTMLElement, t: Task): Element | null {
+    for (const c of list.querySelectorAll<HTMLElement>(':scope > .bd-card')) {
+      const x = tasks.get(c.dataset.id!);
+      if (!x || x.id === t.id || isTemp(x.id)) continue;
+      if (compare(t, x) < 0) return c;
+    }
+    return composer?.list === list && composer.where === 'bottom' ? composer.box : null;
+  }
+  const nextSettled = (card: Element) => {
+    let n = card.nextElementSibling as HTMLElement | null;
+    while (n?.classList.contains('bd-card') && isTemp(n.dataset.id!)) n = n.nextElementSibling as HTMLElement | null;
+    return n;
+  };
+  function arrange(sids = sections.map((x) => x.id), animate = true) {
+    const mutate = () => {
+      for (const sid of sids) {
+        const list = listOf(sid);
+        if (!list) continue;
+        const cards = [...list.querySelectorAll<HTMLElement>(':scope > .bd-card')].filter((c) => !isTemp(c.dataset.id!));
+        const order = [...cards].sort((x, y) => compare(tasks.get(x.dataset.id!)!, tasks.get(y.dataset.id!)!));
+        if (order.every((c, i) => c === cards[i])) continue;
+        const end = composer?.list === list && composer.where === 'bottom' ? composer.box : null;
+        for (const c of order) list.insertBefore(c, end);
+      }
+    };
+    if (animate && visible()) flip(movables(), mutate, 300, EASE_IN_OUT); else mutate();
+  }
+  // A field that a sort reads changed: the card moves to its new place.
+  function resort(t: Task) {
+    if (sort === 'manual' || drag || flying.has(t.id) || !t.sectionId) return;
+    arrange([t.sectionId]);
+  }
+  function showSort() {
+    if (compact) return;
+    const b = $('.bd-sort');
+    b.querySelector('.bd-sort-value')!.textContent = sort === 'manual' ? 'Sort' : `Sort: ${SORTS[sort]}`;
+    b.toggleAttribute('data-active', sort !== 'manual');
+    b.setAttribute('aria-label', `Sort tasks: ${SORTS[sort]}`);
+  }
+  function setSort(k: SortKey) {
+    if (k === sort) return;
+    sort = k;
+    o.onSort?.(k);
+    showSort();
+    arrange();
+    announce(k === 'manual' ? 'Tasks in the order you put them.' : `Tasks sorted by ${SORTS[k].toLowerCase()}.`);
+  }
+  const sortedNote = () => announce(`Sorted by ${SORTS[sort].toLowerCase()}. Choose Manual in Sort to order cards by hand.`);
+
   render();
 
   // ---- saving: show first, then send; the server's answer wins once nothing newer is on its way
@@ -248,7 +333,11 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       return Math.max(0, left);
     };
     request.then(
-      (v) => { if (ac.signal.aborted) return; if (settle() === 0) ok?.(v); },
+      (v) => {
+        if (ac.signal.aborted || settle() > 0) return;
+        ok?.(v);
+        if (id && staleAfter.delete(id)) o.onStale();
+      },
       (err) => { if (ac.signal.aborted) return; settle(); failed?.(); o.onFailure(err); },
     );
   }
@@ -263,6 +352,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       paint(card, t);
       const moving = flying.has(t.id) || drag?.el === card;
       if (!moving && t.sectionId && colOfCard(card) !== t.sectionId) o.onStale();
+      else resort(t);
     }
     emit(t);
   }
@@ -272,7 +362,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     if (!t) return;
     Object.assign(t, fields);
     const card = cardOf(id);
-    if (card) paint(card, t);
+    if (card) { paint(card, t); resort(t); }
     emit(t);
   }
 
@@ -348,14 +438,17 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       flying.delete(t.id);
       if (card) card.classList.remove('is-arriving');
       if (card && !pending.has(t.id) && t.sectionId && colOfCard(card) !== t.sectionId) o.onStale();
+      else if (!pending.has(t.id) && staleAfter.delete(t.id)) o.onStale();
     };
     if (!card || !list) { land(); return; }
     const animate = visible() && !reduced();
     const from = card.getBoundingClientRect();
-    flip(movables().filter((x) => x !== card), () => list.insertBefore(card, list.querySelector('.bd-card')), animate ? 320 : 0);
+    const before = sort === 'manual' ? list.querySelector('.bd-card') : slotFor(list, t);
+    flip(movables().filter((x) => x !== card), () => list.insertBefore(card, before), animate ? 320 : 0);
     counts();
     if (!animate) { land(); return; }
-    list.scrollTop = 0;
+    if (sort === 'manual') list.scrollTop = 0;
+    else list.scrollTop = Math.max(0, card.offsetTop - list.clientHeight / 2);
     card.classList.add('is-arriving');
     const to = card.getBoundingClientRect();
     const wrap = document.createElement('div');
@@ -406,6 +499,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   function settleCard(t: Task, card: HTMLElement, from: { sid: string; index: number }) {
     const sid = colOfCard(card), index = indexOfCard(card);
     if (sid === from.sid && index === from.index) return;
+    if (sort !== 'manual' && sid === from.sid) { arrange([sid]); sortedNote(); return; }
     const d = doneId();
     t.sectionId = sid;
     if (d && sid === d && from.sid !== d && !t.completed) { t.previousSectionId = from.sid; markDone(t); }
@@ -414,7 +508,9 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const shown = [...card.parentElement!.querySelectorAll(':scope > .bd-card:not([hidden])')];
     announce(`${t.title}: ${sectionById(sid)?.name}, ${shown.indexOf(card) + 1} of ${shown.length}.`);
     emit(t);
-    save(t.id, o.actions.moveTask(t.id, sid, index));
+    // Sorted, a card dropped in another section goes to the top of that section's manual order.
+    save(t.id, o.actions.moveTask(t.id, sid, sort === 'manual' ? index : 0));
+    if (sort !== 'manual') arrange([sid]);
   }
 
   function settleCol(col: HTMLElement, fromIndex: number) {
@@ -548,6 +644,12 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const col = hit?.closest<HTMLElement>('.bd-col');
     if (!col || !colsEl.contains(col) || col.classList.contains('is-pending')) return;
     const list = col.querySelector<HTMLElement>('.bd-list')!;
+    if (sort !== 'manual') {
+      if (d.el.parentElement === list) return;
+      flip(movables(), () => list.insertBefore(d.el, slotFor(list, tasks.get(d.id)!)), 240);
+      counts();
+      return;
+    }
     const lr = list.getBoundingClientRect();
     const y = d.y - lr.top + list.scrollTop;
     let next: HTMLElement | null = null;
@@ -621,7 +723,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
           if (visible()) o.onLand?.({ card: d.el, layer });
         } else settleCol(d.el, d.from.index);
       }
-      if (queued) { const b = queued; queued = null; replace(b); }
+      for (const f of inbox.splice(0)) f();
+      flushReload();
     };
     if (reduced() || !d.ghost) { finish(); return; }
     d.ghost.animate([
@@ -646,13 +749,15 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const list = card.parentElement!;
     const siblings = [...list.querySelectorAll<HTMLElement>(':scope > .bd-card:not([hidden])')];
     const i = siblings.indexOf(card);
+    if (sort !== 'manual' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { sortedNote(); return; }
     if (e.key === 'ArrowUp' && i > 0) list.insertBefore(card, siblings[i - 1]!);
     else if (e.key === 'ArrowDown' && i < siblings.length - 1) list.insertBefore(card, siblings[i + 1]!.nextElementSibling);
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       const cols = allCols().filter((c) => !c.classList.contains('is-pending'));
       const target = cols[cols.indexOf(card.closest<HTMLElement>('.bd-col')!) + (e.key === 'ArrowRight' ? 1 : -1)];
       if (!target) return;
-      target.querySelector('.bd-list')!.prepend(card);
+      const tl = target.querySelector<HTMLElement>('.bd-list')!;
+      if (sort === 'manual') tl.prepend(card); else tl.insertBefore(card, slotFor(tl, tasks.get(card.dataset.id!)!));
     } else return;
     card.focus();
     counts(false);
@@ -661,7 +766,6 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   });
 
   // ---- inline composer: type, Enter, and it stays open for the next one
-  let composer: { box: HTMLElement; ta: HTMLTextAreaElement; list: HTMLElement; col: HTMLElement; where: 'top' | 'bottom' } | null = null;
   function openComposer(col: HTMLElement, where: 'top' | 'bottom') {
     closeComposer();
     const list = col.querySelector<HTMLElement>('.bd-list')!;
@@ -694,7 +798,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     const t: Task = {
       id: uid('tmp'), projectId: project.id, sectionId: sid, parentId: null, title, notes: '', assigneeId: null, dueOn: null,
       priority: null, status: null, completed: sid === doneId(), completedAt: null, previousSectionId: null, position: '',
-      createdAt: '', updatedAt: '', subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, attachmentCount: 0, likeCount: 0, liked: false,
+      createdAt: '', updatedAt: '', subtaskCount: 0, subtaskDoneCount: 0, commentCount: 0, attachmentCount: 0, likeCount: 0, liked: false, likerIds: [],
     };
     tasks.set(t.id, t);
     const el = makeCard(t);
@@ -708,7 +812,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       const card = cardOf(t.id);
       tasks.delete(t.id);
       tasks.set(real.id, { ...real });
-      if (card) { card.dataset.id = real.id; paint(card, tasks.get(real.id)!); }
+      if (card) { card.dataset.id = real.id; paint(card, tasks.get(real.id)!); resort(tasks.get(real.id)!); }
     }, () => {
       tasks.delete(t.id);
       cardOf(t.id)?.remove();
@@ -722,6 +826,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     composer = null;
     flip(movables().filter((x) => x !== box), () => box.remove(), 180);
     if (focusBack) col.querySelector<HTMLElement>('.bd-add')?.focus();
+    flushReload();
   }
 
   // ---- sections
@@ -780,10 +885,12 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     h.replaceWith(input);
     input.focus();
     input.select();
+    renaming = true;
     let finished = false;
     const finish = (keep: boolean) => {
       if (finished) return;
       finished = true;
+      renaming = false;
       const name = input.value.trim().replace(/\s+/g, ' ');
       input.replaceWith(h);
       if (keep && name && name !== s.name) {
@@ -794,6 +901,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
         persist(o.actions.renameSection(s.id, name));
       }
       col.querySelector<HTMLElement>('.bd-col-more')?.focus();
+      flushReload();
     };
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -831,13 +939,35 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   }
 
   // ---- the section menu: rename, move left or right, delete (with a second step)
-  let menuFor: HTMLElement | null = null;
+  let menuFor: HTMLElement | null = null; // the column, for a section menu
+  let menuBtn: HTMLElement | null = null;
   const menuItems = () => [...menu.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+  function showMenu(btn: HTMLElement, origin: 'left' | 'right') {
+    menu.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const w = menu.offsetWidth;
+    menu.style.left = `${clamp(origin === 'right' ? r.right - w : r.left, 8, innerWidth - w - 8)}px`;
+    menu.style.top = `${r.bottom + 6}px`;
+    menu.style.transformOrigin = `top ${origin}`;
+    btn.setAttribute('aria-expanded', 'true');
+    if (!reduced()) menu.animate([{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
+  }
+  function openSortMenu(btn: HTMLElement) {
+    if (menuBtn === btn) { closeMenu(true); return; }
+    closeMenu(false);
+    menuBtn = btn;
+    menu.innerHTML = `<p class="bd-menu-note">Order cards in each section by</p>${(Object.keys(SORTS) as SortKey[]).map((k) =>
+      `<button type="button" role="menuitemradio" aria-checked="${k === sort}" data-m="sort:${k}">${SORTS[k]}</button>`).join('')}`;
+    menu.setAttribute('aria-label', 'Sort tasks');
+    showMenu(btn, 'right');
+    (menu.querySelector<HTMLElement>('[aria-checked="true"]') ?? menuItems()[0])?.focus();
+  }
   function openMenu(btn: HTMLElement) {
     const col = btn.closest<HTMLElement>('.bd-col')!;
     if (menuFor === col) { closeMenu(true); return; }
     closeMenu(false);
     menuFor = col;
+    menuBtn = btn;
     const cols = allCols(), i = cols.indexOf(col);
     menu.innerHTML = `
       <button type="button" role="menuitem" data-m="rename">Rename</button>
@@ -845,24 +975,20 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
       <button type="button" role="menuitem" data-m="right"${i === cols.length - 1 ? ' disabled' : ''}>Move right</button>
       <button type="button" role="menuitem" data-m="delete" class="is-danger"${cols.length < 2 ? ' disabled' : ''}>Delete section</button>`;
     menu.setAttribute('aria-label', `${sectionById(col.dataset.section!)?.name ?? 'Section'} options`);
-    menu.hidden = false;
-    const r = btn.getBoundingClientRect();
-    const w = menu.offsetWidth;
-    menu.style.left = `${clamp(r.right - w, 8, innerWidth - w - 8)}px`;
-    menu.style.top = `${r.bottom + 6}px`;
-    btn.setAttribute('aria-expanded', 'true');
-    if (!reduced()) menu.animate([{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: EASE_OUT });
+    showMenu(btn, 'right');
     menuItems()[0]?.focus();
   }
   function closeMenu(focusBack: boolean) {
-    if (!menuFor) return;
-    const btn = menuFor.querySelector<HTMLElement>('.bd-col-more');
-    btn?.setAttribute('aria-expanded', 'false');
+    if (!menuBtn) return;
+    const btn = menuBtn;
+    btn.setAttribute('aria-expanded', 'false');
     menuFor = null;
+    menuBtn = null;
     menu.hidden = true;
-    if (focusBack) btn?.focus();
+    if (focusBack && btn.isConnected) btn.focus();
   }
   function menuChoice(m: string) {
+    if (m.startsWith('sort:')) { closeMenu(true); setSort(m.slice(5) as SortKey); return; }
     const col = menuFor;
     if (!col) return;
     const sid = col.dataset.section!;
@@ -888,7 +1014,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     else if (e.key === 'Tab') closeMenu(false);
   });
   listen(document, 'pointerdown', (e) => {
-    if (menuFor && !menu.contains(e.target as Node) && !(e.target as HTMLElement).closest?.('.bd-col-more')) closeMenu(false);
+    if (menuBtn && !menu.contains(e.target as Node) && !(e.target as HTMLElement).closest?.('.bd-col-more, .bd-sort')) closeMenu(false);
   });
   listen(scroller, 'scroll', () => closeMenu(false), { passive: true });
 
@@ -910,6 +1036,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     if (tgt.closest('.bd-col-plus') && col) { openComposer(col, 'top'); return; }
     const more = tgt.closest<HTMLElement>('.bd-col-more');
     if (more) { openMenu(more); return; }
+    const sortBtn = tgt.closest<HTMLElement>('.bd-sort');
+    if (sortBtn) { openSortMenu(sortBtn); return; }
     if (tgt.closest('[data-act="add-top"]')) { const first = allCols()[0]; if (first) openComposer(first, 'top'); return; }
     if (tgt.closest('[data-act="compose-add"]')) { addFromComposer(); return; }
     if (tgt.closest('[data-act="compose-cancel"]')) { closeComposer(true); return; }
@@ -944,8 +1072,15 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     counts();
   }
 
+  // A reload never lands mid-drag, mid-rename or while the composer is open; it waits, then asks for a fresh copy.
+  const busy = () => !!drag || !!composer || renaming;
+  function flushReload() {
+    if (!reloadWanted || busy()) return;
+    reloadWanted = false;
+    later(() => o.onStale(), 0);
+  }
   function replace(b: Board) {
-    if (drag) { queued = b; return; }
+    if (busy()) { reloadWanted = true; return; }
     closeComposer();
     closeMenu(false);
     const left = scroller.scrollLeft;
@@ -961,6 +1096,81 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     for (const t of tasks.values()) emit(t);
   }
 
+  // ---- other people's changes
+  const who = (id: string) => nameOf(id) ?? 'Someone';
+  function remoteTask(s: Omit<Task, 'liked'>, actorId: string) {
+    if (drag) { inbox.push(() => remoteTask(s, actorId)); return; }
+    if (s.parentId || s.projectId !== project.id) return;
+    if (pending.has(s.id) || flying.has(s.id)) { staleAfter.add(s.id); return; }
+    const t = tasks.get(s.id);
+    const liked = s.likerIds.includes(o.me);
+    if (!t) {
+      const list = s.sectionId ? listOf(s.sectionId) : null;
+      if (!list) return;
+      const nt: Task = { ...s, liked };
+      tasks.set(nt.id, nt);
+      const card = makeCard(nt);
+      card.hidden = !matches(nt);
+      flip(movables(), () => list.insertBefore(card, slotFor(list, nt)), 260);
+      if (visible() && !reduced() && !card.hidden) card.animate([{ opacity: 0, transform: 'translateY(10px) scale(0.97)' }, { opacity: 1, transform: 'none' }], { duration: 300, easing: EASE_OUT });
+      counts();
+      mark(card, actorId);
+      announce(`${who(actorId)} added ${nt.title} to ${sectionById(nt.sectionId)?.name}.`);
+      return;
+    }
+    if (t.updatedAt && s.updatedAt && s.updatedAt < t.updatedAt) return; // an older copy than ours
+    const from = t.sectionId, wasDone = t.completed;
+    Object.assign(t, s, { liked });
+    const card = cardOf(t.id);
+    if (!card) { emit(t); return; }
+    const list = t.sectionId ? listOf(t.sectionId) : null;
+    if (!list) { o.onStale(); return; }
+    paint(card, t);
+    card.hidden = !matches(t);
+    const slot = slotFor(list, t);
+    if (card.parentElement !== list || nextSettled(card) !== slot) {
+      flip(movables(), () => list.insertBefore(card, slot), 420, EASE_IN_OUT);
+      counts();
+    }
+    if (t.completed && !wasDone) { card.classList.add('is-ticked'); later(() => card.classList.remove('is-ticked'), 500); }
+    mark(card, actorId);
+    if (from !== t.sectionId) announce(`${who(actorId)} moved ${t.title} to ${sectionById(t.sectionId)?.name}.`);
+    else if (t.completed !== wasDone) announce(`${who(actorId)} marked ${t.title} ${t.completed ? 'complete' : 'incomplete'}.`);
+    emit(t);
+  }
+
+  function remoteRemove(id: string, actorId: string) {
+    if (drag) { inbox.push(() => remoteRemove(id, actorId)); return; }
+    const t = tasks.get(id);
+    if (!t) return;
+    staleAfter.delete(id);
+    remove(id);
+    announce(`${who(actorId)} deleted ${t.title}.`);
+  }
+
+  // Whose change it was: their avatar on the card for a moment, and a ring around it.
+  function mark(card: HTMLElement, actorId: string) {
+    const u = users.find((x) => x.id === actorId);
+    if (!u || card.hidden || !visible()) return;
+    card.querySelector('.bd-by')?.remove();
+    const b = document.createElement('span');
+    b.className = 'bd-avatar bd-by';
+    b.dataset.tone = String(toneOf(users, u.id));
+    b.textContent = initials(u.displayName);
+    b.title = `Changed by ${u.displayName}`;
+    b.setAttribute('aria-hidden', 'true');
+    card.append(b);
+    card.classList.remove('is-remote');
+    void card.offsetWidth;
+    card.classList.add('is-remote');
+    if (!reduced()) b.animate([{ opacity: 0, transform: 'scale(0.6)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });
+    later(() => {
+      card.classList.remove('is-remote');
+      if (reduced()) { b.remove(); return; }
+      b.animate([{ opacity: 1 }, { opacity: 0, transform: 'scale(0.8)' }], { duration: 300, easing: EASE_OUT, fill: 'forwards' }).onfinish = () => b.remove();
+    }, 2400);
+  }
+
   return {
     get: (id) => tasks.get(id),
     select,
@@ -971,6 +1181,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     moveTo,
     subscribe: (fn) => { subs.add(fn); return () => subs.delete(fn); },
     replace,
+    remoteTask,
+    remoteRemove,
     isDragging: () => !!drag?.started,
     focusCard: (id) => cardOf(id)?.focus({ preventScroll: true }),
     destroy() {

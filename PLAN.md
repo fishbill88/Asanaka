@@ -26,7 +26,7 @@ We copy Asana's board interactions, not its name, logo or artwork.
 | Ordering | Fractional-index string keys on sections and tasks | A drag rewrites one row, never the whole column |
 | Auth | Username + password, `scrypt` hashes, opaque bearer tokens (12 h) | Cookies won't cross from github.io to the API host; tokens will |
 | Brute force | 5 wrong passwords per address and username → 15-minute lock | The login page is public |
-| Realtime | Server-sent events per project (phase 6) | One-way updates are enough; they pass through Caddy unchanged |
+| Realtime | Server-sent events per project, read with `fetch` so the bearer token goes in a header; an in-memory hub in the one API process | One-way updates are enough; they pass through Caddy unchanged. A tab names itself (`X-Asanaka-Client`) on writes, so it never hears its own changes back |
 
 ## 2. What we replicate from Asana's board
 
@@ -48,8 +48,18 @@ We copy Asana's board interactions, not its name, logo or artwork.
   them on the task pane, or by pasting into the description, where they upload at once and images show in
   place. Cards count them; images open in a lightbox.
 
-**v1.1 (phase 6–7)**: live updates between people, sort, likes, task activity feed, admin users page,
-multi-select drag, keyboard shortcuts (`Tab+Q` quick add, `Tab+Enter` complete).
+**v1.1, phase 6 (added 30 Oct 2026)**
+- Live updates: a move, tick, new task, edit, comment, like, file or deletion in one browser glides into place
+  in every other browser on that board within a second, with the person's avatar on the card for a moment.
+  Section and project changes reload the board, but never mid-drag, mid-rename or while the composer is open.
+  A stream that drops reconnects by itself and reloads the board to catch up.
+- Sort: Manual, Due date, Likes, Alphabetical, Assignee, Newest first, remembered per project in this browser.
+  Sorted, cards still move between sections (they land in their sorted place) but not up and down.
+- Likes: a Like button in the task pane naming who liked it; cards count likes.
+- The task feed: Comments, or All activity with the changes woven in, oldest first; it refreshes when someone
+  else changes the task.
+
+**v1.1, phase 7**: admin users page, multi-select drag, keyboard shortcuts (`Tab+Q` quick add, `Tab+Enter` complete).
 
 **Later**: list, timeline and calendar views, attachments, custom fields, notifications.
 
@@ -137,7 +147,7 @@ Indexes: `tasks (section_id, position) where deleted_at is null and parent_id is
 | `GET /tasks/:id` · `DELETE /tasks/:id` | full task with subtasks, comments, activity · soft delete |
 | `POST /tasks/:id/subtasks` · `POST /tasks/:id/comments` · `PUT/DELETE /tasks/:id/like` | |
 | `POST /tasks/:id/attachments?name=&type=` · `GET/DELETE /attachments/:id` | upload raw bytes (10 MB), download (always as a sandboxed attachment), remove |
-| `GET /projects/:id/events` | server-sent events: task and section changes by other people (phase 6) |
+| `GET /projects/:id/events?client=<tab>` | server-sent events: `task` (a card as everyone sees it), `task-removed`, `board` (sections or the project changed); never the changes this tab made. A heartbeat every 25 s also ends the stream if the session has ended |
 | `GET/POST /admin/users` · `POST /admin/users/:id/password` | admin only (phase 7) |
 | `GET /healthz` | liveness for Docker and the deploy script |
 

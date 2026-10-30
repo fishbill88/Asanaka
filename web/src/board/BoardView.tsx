@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, messageOf } from '../lib/api';
+import { connectLive } from '../lib/live';
 import { follow, href, navigate } from '../lib/router';
 import type { Board, Section } from '../types';
 import { pinCelebration } from './celebrate';
-import { mountBoard, type BoardEngine } from './engine';
+import { SORTS, mountBoard, type BoardEngine, type SortKey } from './engine';
 import { TaskPane } from './TaskPane';
 
 interface Props {
@@ -14,7 +15,17 @@ interface Props {
 }
 
 // One project's board. The engine owns the columns and cards; this component loads the data, turns the
-// engine's changes into API calls, and shows the task pane for /p/<project>/t/<task>.
+// engine's changes into API calls, keeps the live stream open so other people's changes arrive, and shows
+// the task pane for /p/<project>/t/<task>.
+
+// The sort is a per-browser preference for each project.
+const sortKey = (projectId: string) => `asanaka.sort.${projectId}`;
+function savedSort(projectId: string): SortKey {
+  try { const v = localStorage.getItem(sortKey(projectId)); return v && v in SORTS ? (v as SortKey) : 'manual'; } catch { return 'manual'; }
+}
+function saveSort(projectId: string, k: SortKey) {
+  try { if (k === 'manual') localStorage.removeItem(sortKey(projectId)); else localStorage.setItem(sortKey(projectId), k); } catch { /* storage blocked: lasts this visit */ }
+}
 export function BoardView({ projectId, taskId, me, onBoard }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const band = useRef<HTMLDivElement>(null);
@@ -24,6 +35,9 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
   const [missing, setMissing] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [paneId, setPaneId] = useState<string | null>(taskId);
+  const [remote, setRemote] = useState<{ id: string; n: number } | null>(null);
+  const openTask = useRef(taskId);
+  useEffect(() => { openTask.current = taskId; }, [taskId]);
   const reloadRef = useRef<() => void>(() => {});
   const onBoardRef = useRef(onBoard);
   useEffect(() => { onBoardRef.current = onBoard; }, [onBoard]);
@@ -38,6 +52,7 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
   useEffect(() => {
     let alive = true;
     let eng: BoardEngine | null = null;
+    let stopLive = () => {};
     const cheer = pinCelebration(band.current!);
     let reloading = false;
     const reload = async () => {
@@ -72,12 +87,33 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
         onFailure: fail,
         onStale: () => { void reload(); },
         onSections: setSections,
+        sort: savedSort(projectId),
+        onSort: (k) => saveSort(projectId, k),
         celebrate: cheer.celebrate,
         onLand: cheer.onLand,
       });
       setEngine(eng);
       setBoard(b);
       onBoardRef.current(b);
+
+      let n = 0;
+      stopLive = connectLive(projectId, {
+        onEvent: (e) => {
+          if (!eng) return;
+          if (e.type === 'task') {
+            eng.remoteTask(e.task, e.actorId);
+            setRemote({ id: e.task.id, n: ++n });
+          } else if (e.type === 'task-removed') {
+            const name = b.users.find((u) => u.id === e.actorId)?.displayName ?? 'Someone';
+            eng.remoteRemove(e.id, e.actorId);
+            if (openTask.current === e.id) {
+              setToast(`${name} deleted this task.`);
+              navigate(`/p/${projectId}`, { replace: true });
+            }
+          } else if (e.type === 'board') void reload();
+        },
+        onResync: () => { void reload(); },
+      });
     }, (err) => {
       if (!alive || (err instanceof ApiError && err.status === 401)) return;
       setMissing(err instanceof ApiError && err.status === 404 ? 'This project isn’t here any more. It may have been archived.' : messageOf(err));
@@ -85,6 +121,7 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
 
     return () => {
       alive = false;
+      stopLive();
       cheer.dispose();
       eng?.destroy();
       setEngine(null);
@@ -128,6 +165,7 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
           onClosed={() => setPaneId(null)}
           onFailure={fail}
           onNotice={setToast}
+          remote={remote}
         />
       )}
       <div ref={band} className="done-band" aria-hidden="true" hidden>
