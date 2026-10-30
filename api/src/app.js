@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { HttpError } from './errors.js';
+import adminRoutes from './routes/admin.js';
 import attachmentRoutes, { MAX_FILE } from './routes/attachments.js';
 import authRoutes from './routes/auth.js';
 import boardRoutes, { readTask } from './routes/board.js';
@@ -53,6 +54,7 @@ export function buildApp({ db, config, logger = false, hub = createHub() }) {
   authRoutes(app, ctx);
   boardRoutes(app, ctx);
   attachmentRoutes(app, ctx);
+  adminRoutes(app, ctx);
   liveRoutes(app, ctx);
   return app;
 }

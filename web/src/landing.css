@@ -103,7 +103,7 @@ html:has(.landing) { scroll-behavior: smooth; }
 .mini[data-state="3"] .mini-mover .mini-card { outline-color: transparent; }
 .mini[data-state="3"] .mini-mover .bd-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .mini .caret { display: inline-block; width: 2px; height: 1em; background: var(--accent); vertical-align: -0.15em; margin-left: 1px; }
-.mini[data-state="1"] .caret { animation: blink 1s steps(1) infinite; }
+@media (prefers-reduced-motion: no-preference) { .mini[data-state="1"] .caret { animation: blink 1s steps(1) infinite; } }
 .mini:not([data-state="1"]) .caret { display: none; }
 @keyframes blink { 50% { opacity: 0; } }
 .mini-spacer { height: 64px; }

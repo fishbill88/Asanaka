@@ -165,13 +165,19 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
+      // Ctrl (or Cmd) + Enter completes the task, except in the comment box, where it posts.
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.defaultPrevented && !(e.target as HTMLElement).closest?.('#pane-say')) {
+        e.preventDefault();
+        engine.toggle(taskId);
+        return;
+      }
       if (e.key !== 'Escape' || e.defaultPrevented || engine.isDragging()) return;
       if (viewing) { setViewing(null); return; }
       onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, engine, onClose, viewing]);
+  }, [open, engine, onClose, viewing, taskId]);
 
   const refreshing = useRef(0);
   const refreshSoon = useCallback((after: Promise<unknown>) => {
@@ -518,7 +524,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
       <form className="pane-say" onSubmit={postComment}>
         <Avatar board={board} id={me} />
         <label className="sr-only" htmlFor="pane-say">Comment</label>
-        <textarea id="pane-say" rows={1} maxLength={10000} placeholder="Ask a question or post an update" value={say}
+        <textarea id="pane-say" rows={1} maxLength={10000} placeholder="Write a comment" value={say}
           onChange={(e) => setSay(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) postComment(); }} />
         <button type="submit" className="bd-btn">Comment</button>

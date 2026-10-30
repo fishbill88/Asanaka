@@ -1,4 +1,4 @@
-import type { Attachment, Board, Comment, Project, Section, Session, Task, TaskDetail, User } from '../types';
+import type { Attachment, Board, Comment, Person, Project, Section, Session, Task, TaskDetail, User } from '../types';
 
 // The API's address is baked in at build time from the ASANAKA_API_ORIGIN repository variable. In
 // development the site calls its own origin and Vite passes /api through (see vite.config.ts).
@@ -73,6 +73,14 @@ export const api = {
   addSubtask: (id: string, title: string) => write<{ task: Task }>('POST', `/api/tasks/${id}/subtasks`, { title }),
   addComment: (id: string, body: string) => write<{ comment: Comment }>('POST', `/api/tasks/${id}/comments`, { body }),
   like: (id: string, on: boolean) => write<{ task: Task }>(on ? 'PUT' : 'DELETE', `/api/tasks/${id}/like`),
+
+  changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/api/me/password', { current, next }),
+  people: () => request<{ users: Person[] }>('GET', '/api/admin/users'),
+  addPerson: (username: string, displayName: string, role: User['role']) =>
+    write<{ user: Person; password: string }>('POST', '/api/admin/users', { username, displayName, role }),
+  updatePerson: (id: string, fields: { displayName?: string; role?: User['role']; disabled?: boolean }) =>
+    write<{ user: Person }>('PATCH', `/api/admin/users/${id}`, fields),
+  resetPassword: (id: string) => write<{ user: Person; password: string }>('POST', `/api/admin/users/${id}/password`),
 };
 
 // ---- attachments

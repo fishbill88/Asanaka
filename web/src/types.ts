@@ -8,6 +8,14 @@ export interface User {
   avatarHue: number;
 }
 
+// A person as the People page sees them (admins only).
+export interface Person extends User {
+  disabled: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+  sessions: number;
+}
+
 export interface Project {
   id: string;
   name: string;

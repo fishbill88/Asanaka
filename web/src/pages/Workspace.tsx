@@ -4,9 +4,12 @@ import { initials, toneOf } from '../board/format';
 import { api, messageOf } from '../lib/api';
 import { follow, href, navigate } from '../lib/router';
 import type { Board, Project, Session, User } from '../types';
+import { AccountMenu, ChangePassword, canChangePassword } from './Account';
+import { People } from './People';
 
 interface Props {
   session: Session;
+  view?: 'board' | 'people';
   projectId: string | null;
   taskId: string | null;
   onSignOut(): void;
@@ -16,14 +19,16 @@ const Plus = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
 );
 
-// The signed-in app: projects on the left, the board of the one you're in, your name and sign-out.
-export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
+// The signed-in app: projects on the left, the board of the one you're in (or People, for admins), your
+// name, password and sign-out. On a phone the sidebar folds into the top bar and your avatar's menu.
+export function Workspace({ session, view = 'board', projectId, taskId, onSignOut }: Props) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [users, setUsers] = useState<User[]>([session.user]);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -33,11 +38,11 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
 
   // /board opens the first project.
   useEffect(() => {
-    if (projects?.length && !projectId) navigate(`/p/${projects[0]!.id}`, { replace: true });
-  }, [projects, projectId]);
+    if (view === 'board' && projects?.length && !projectId) navigate(`/p/${projects[0]!.id}`, { replace: true });
+  }, [view, projects, projectId]);
 
   const current = projects?.find((p) => p.id === projectId);
-  useEffect(() => { document.title = current ? `${current.name} · Asanaka` : 'Asanaka'; }, [current]);
+  useEffect(() => { if (view === 'board') document.title = current ? `${current.name} · Asanaka` : 'Asanaka'; }, [view, current]);
 
   const onBoard = useCallback((b: Board) => {
     setUsers(b.users);
@@ -63,7 +68,8 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
   };
 
   const me = session.user;
-  const meAvatar = <span className="bd-avatar" data-tone={toneOf(users, me.id)}>{initials(me.displayName)}</span>;
+  const isAdmin = me.role === 'admin';
+  const meAvatar = <span className="bd-avatar" data-tone={toneOf(users, me.id)} aria-hidden="true">{initials(me.displayName)}</span>;
   const mark = (
     <a className="side-mark" href={href('/')} onClick={(e) => follow(e, '/')}><span className="dot" aria-hidden="true" />Asanaka</a>
   );
@@ -77,7 +83,7 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
           <ul className="side-projects">
             {projects?.map((p) => (
               <li key={p.id}>
-                <a className="side-proj" href={href(`/p/${p.id}`)} aria-current={p.id === projectId ? 'page' : undefined} onClick={(e) => follow(e, `/p/${p.id}`)}>
+                <a className="side-proj" href={href(`/p/${p.id}`)} aria-current={view === 'board' && p.id === projectId ? 'page' : undefined} onClick={(e) => follow(e, `/p/${p.id}`)}>
                   <span className="dot" style={{ background: p.color }} aria-hidden="true" />
                   <span className="side-proj-name">{p.name}</span>
                 </a>
@@ -96,12 +102,23 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
             <button type="button" className="side-new" onClick={() => setAdding(true)}><Plus />New project</button>
           )}
           {error && projects && <p className="side-error" role="alert">{error}</p>}
+          {isAdmin && (
+            <>
+              <h2 className="side-h-gap">Admin</h2>
+              <a className="side-proj" href={href('/people')} aria-current={view === 'people' ? 'page' : undefined} onClick={(e) => follow(e, '/people')}>
+                <span className="dot side-dot-ink" aria-hidden="true" /><span className="side-proj-name">People</span>
+              </a>
+            </>
+          )}
         </nav>
-        <p className="side-tip">Tap a dot to finish a task. Drag a card to move it. Enter opens one; Alt and the arrow keys move it.</p>
+        <p className="side-tip">Tap a dot to finish a task. Drag a card to move it, or press Space on it, then the arrow keys, then Space. Enter opens a card; Q adds one.</p>
         <div className="side-me">
           {meAvatar}
           <span>{me.displayName}</span>
-          <button type="button" onClick={onSignOut}>Sign out</button>
+          <div className="side-me-actions">
+            {canChangePassword(me) && <button type="button" onClick={() => setChanging(true)}>Change password</button>}
+            <button type="button" onClick={onSignOut}>Sign out</button>
+          </div>
         </div>
       </aside>
 
@@ -112,11 +129,18 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         )}
-        <button type="button" onClick={onSignOut}>Sign out</button>
+        <AccountMenu avatar={meAvatar} label={`${me.displayName}: account`}>
+          {view === 'people' && projects?.[0] && <button type="button" role="menuitem" onClick={() => navigate(`/p/${projects[0]!.id}`)}>Back to the board</button>}
+          {isAdmin && view !== 'people' && <button type="button" role="menuitem" onClick={() => navigate('/people')}>People</button>}
+          {canChangePassword(me) && <button type="button" role="menuitem" onClick={() => setChanging(true)}>Change password</button>}
+          <button type="button" role="menuitem" onClick={onSignOut}>Sign out</button>
+        </AccountMenu>
       </div>
 
       <main className="app-main">
-        {error && !projects ? (
+        {view === 'people' ? (
+          isAdmin ? <People me={me} /> : <div className="board-state"><p>Only an admin can manage people.</p></div>
+        ) : error && !projects ? (
           <div className="board-state"><p>{error}</p></div>
         ) : projectId ? (
           <BoardView key={projectId} projectId={projectId} taskId={taskId} me={me.id} onBoard={onBoard} />
@@ -129,6 +153,7 @@ export function Workspace({ session, projectId, taskId, onSignOut }: Props) {
           <p className="board-state" role="status"><span className="dot" aria-hidden="true" />Opening your projects…</p>
         )}
       </main>
+      <ChangePassword open={changing} onClose={() => setChanging(false)} />
     </div>
   );
 }

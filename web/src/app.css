@@ -56,12 +56,15 @@
   .side-proj:not([aria-current="page"]):hover { background: rgba(255, 255, 255, 0.45); }
   .side-new:hover { background: rgba(255, 255, 255, 0.45); color: var(--ink); }
 }
+.side-h-gap { margin-top: 18px !important; }
+.side-dot-ink { background: var(--ink); }
 .side-tip { font-size: 14px; color: var(--muted); padding-left: 6px; align-self: start; }
 .side-me { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; font-size: 15px; padding-left: 6px; }
-.side-me button { grid-column: 1 / -1; justify-self: start; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--card); cursor: pointer; font-size: 14px; transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease; }
+.side-me-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.side-me button { justify-self: start; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--card); cursor: pointer; font-size: 14px; transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease; }
 .side-me button:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) { .side-me button:hover { background: #fff; } }
-.app-main { min-width: 0; min-height: 0; display: grid; }
+.app-main { position: relative; min-width: 0; min-height: 0; display: grid; }
 .app-top { display: none; }
 
 /* ---------- the board ---------- */
@@ -127,6 +130,8 @@
 .bd-card.is-selected { outline: 3px solid var(--accent); outline-offset: -3px; }
 .bd-card.is-placeholder { background: rgba(10, 10, 10, 0.08); }
 .bd-card.is-placeholder > * { visibility: hidden; }
+/* Picked up with Space: tilted and outlined until it is put down (keyboard moves themselves don't animate). */
+.bd-card.is-lifted { background: #fff; outline: 3px dashed var(--accent); outline-offset: -3px; transform: rotate(-1.2deg); }
 .bd-card.is-arriving { opacity: 0; }
 .bd-card.is-pending { opacity: 0.7; cursor: progress; }
 .bd-card.is-pending .bd-check { visibility: hidden; }
@@ -136,7 +141,7 @@
 @media (hover: hover) and (pointer: fine) { .bd-check:hover { border-color: var(--accent); color: var(--accent); } }
 .bd-card.is-done .bd-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .bd-check-path { stroke-dasharray: 20; stroke-dashoffset: 0; }
-.bd-card.is-ticked .bd-check-path { animation: draw 380ms var(--ease-out) both; }
+@media (prefers-reduced-motion: no-preference) { .bd-card.is-ticked .bd-check-path { animation: draw 380ms var(--ease-out) both; } }
 @keyframes draw { from { stroke-dashoffset: 20; } }
 .bd-card.is-done .bd-title { color: var(--muted); }
 .bd-card-body { display: grid; gap: 9px; min-width: 0; }
@@ -307,6 +312,67 @@
 .pane-say textarea { resize: none; min-height: 42px; max-height: 120px; border: 0; border-radius: 21px; padding: 10px 14px; background: var(--card); font-size: 15px; }
 .pane-say .bd-btn { min-height: 42px; }
 
+/* ---------- People (admins) ---------- */
+.people { min-height: 0; overflow-y: auto; display: grid; gap: 18px; align-content: start; padding: max(24px, env(safe-area-inset-top, 0px)) 28px 40px; }
+.people-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; max-width: 980px; }
+.people-top h1 { font-size: clamp(28px, 2.6vw, 38px); font-weight: 500; letter-spacing: -0.02em; line-height: 1; }
+.people-top p { margin-top: 8px; color: var(--muted); font-size: 15px; }
+.people-error { max-width: 980px; color: var(--late); font-size: 15px; font-weight: 500; }
+.people-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 980px; }
+.people-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; padding: 16px 18px; border-radius: 28px; background: var(--card); }
+.people-card.is-off { background: var(--surface); }
+.people-card.is-off h2 { color: var(--muted); }
+.people-avatar { width: 46px; height: 46px; font-size: 15px; }
+.people-who { min-width: 0; display: grid; gap: 4px; }
+.people-who h2 { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.people-you { font-weight: 400; color: var(--muted); }
+.people-who p { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 14px; color: var(--muted); }
+.people-who .people-note { font-size: 13px; }
+.people-chip { padding: 1px 10px; border-radius: 999px; background: var(--sand); color: var(--ink); font-size: 13px; font-weight: 500; }
+.people-chip[data-role="admin"] { background: var(--ink); color: var(--night-ink); }
+.people-rename { max-width: 320px; }
+.people-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
+.people-ask { max-width: 36ch; font-size: 14px; }
+.people-act { min-height: 38px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--bg); font-size: 14px; cursor: pointer; transition: background-color var(--t-hover) ease, transform var(--t-press) var(--ease-out); }
+.people-act:active { transform: scale(0.97); }
+.people-act.is-danger { color: var(--late); }
+@media (hover: hover) and (pointer: fine) { .people-act:hover { background: var(--surface); } }
+.people-add, .people-pass { max-width: 980px; display: grid; gap: 14px; padding: 20px 22px; border-radius: 28px; background: var(--card); }
+.people-add h2, .people-pass h2 { font-size: 18px; font-weight: 600; }
+.people-add .people-row-actions { justify-content: flex-start; }
+.people-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.people-field { display: grid; gap: 6px; font-size: 14px; }
+.people-field span { color: var(--muted); }
+/* A new password: on sand so it can't be missed, set in a monospace face so l and 1 differ. */
+.people-pass { background: var(--sand); }
+.people-pass:focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+.people-pass p { font-size: 15px; }
+.people-pass-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.people-pass-value { padding: 10px 18px; border-radius: 999px; background: var(--card); font-family: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace; font-size: 18px; letter-spacing: 0.04em; overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
+@media (prefers-reduced-motion: no-preference) { .people-pass, .people-add { animation: rise-in 220ms var(--ease-out); } }
+
+/* ---------- dialogs: change your password ---------- */
+.sheet { width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: 32px; background: var(--card); color: var(--ink); box-shadow: 0 30px 80px rgba(10, 40, 60, 0.3); /* taste-skill-ignore: a dialog floats */ }
+.sheet::backdrop { background: rgba(10, 10, 10, 0.42); }
+.sheet-body { display: grid; gap: 14px; padding: 26px 24px 22px; }
+.sheet h2 { font-size: 24px; font-weight: 500; letter-spacing: -0.015em; }
+.sheet p { font-size: 15px; }
+.sheet .form-error:empty { display: none; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet[open] { animation: rise-in 220ms var(--ease-out); }
+  .sheet[open]::backdrop { animation: fade-in 220ms ease; }
+}
+@keyframes fade-in { from { opacity: 0; } }
+
+/* ---------- your account, on a phone ---------- */
+.acct { position: relative; flex: none; }
+.acct-btn { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; cursor: pointer; transition: transform var(--t-press) var(--ease-out); }
+.acct-btn:active { transform: scale(0.94); }
+.acct-btn .bd-avatar { width: 38px; height: 38px; font-size: 13px; }
+.acct-menu { position: absolute; top: calc(100% + 6px); right: 0; }
+@media (prefers-reduced-motion: no-preference) { .acct-menu { animation: rise-in 160ms var(--ease-out); } }
+
 /* ---------- "Nahuman na." and notices ---------- */
 .done-band { position: fixed; left: 0; right: 0; bottom: max(24px, env(safe-area-inset-bottom, 0px)); z-index: 95; display: flex; justify-content: center; padding-inline: 16px; pointer-events: none; }
 .done-pill { display: grid; justify-items: center; gap: 4px; max-width: 100%; padding: 18px 48px 20px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); text-align: center; box-shadow: 0 24px 60px rgba(90, 10, 70, 0.3); /* taste-skill-ignore: a passing notice floats */ }
@@ -324,11 +390,13 @@
 @media (max-width: 900px) {
   .signin { grid-template-columns: 1fr; padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
   .signin-card { grid-column: 1; }
+  /* On a phone the circle rises in the top corner, clear of the form, so every label stays on sky. */
+  .signin-ball { width: 120vw; right: -70vw; top: -75vw; bottom: auto; }
   .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .side { display: none; }
   .app-top { display: flex; align-items: center; gap: 10px; padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 4px max(16px, env(safe-area-inset-left, 0px)); }
   .app-top .side-mark { padding-left: 0; margin-right: auto; font-size: 18px; }
-  .app-top button, .app-top-project { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--card); font-size: 14px; }
+  .app-top-project { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: var(--card); font-size: 14px; }
   .app-top-project { max-width: 44vw; }
   .bd-top { padding: 12px 16px; }
   .bd-proj-name { font-size: 26px; }
@@ -339,6 +407,10 @@
   .bd-col { width: 84vw; scroll-snap-align: start; }
   .pane { top: 6px; right: 6px; bottom: 6px; width: calc(100% - 12px); border-radius: 26px; }
   .pane-field { grid-template-columns: 86px 1fr; }
+  .people { padding: 12px 16px 32px; }
+  .people-card { grid-template-columns: auto 1fr; padding: 14px; }
+  .people-card .people-row-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .people-fields { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .done-pill { padding: 16px 32px 18px; }

@@ -42,7 +42,7 @@ try {
       break;
     }
     case 'rename': {
-      const name = rest.join(' ').trim().replace(/s+/g, ' ');
+      const name = rest.join(' ').trim().replace(/\s+/g, ' ');
       if (!arg || !name || name.length > 60) fail('usage: rename <username> <display name, up to 60 characters>');
       const r = (await db.query('UPDATE users SET display_name = $2, updated_at = now() WHERE lower(username) = lower($1) RETURNING username, display_name', [arg, name])).rows[0];
       if (!r) fail(`no account named ${arg}`);

@@ -2,7 +2,8 @@ import type { Board, Project, Section, Task, User } from '../types';
 import { PRIORITY, STATUS, dueOf, esc, initials, toneOf } from './format';
 import { EASE_IN_OUT, EASE_OUT, flip, reduced } from './motion';
 
-/* The board: columns and cards, moved by pointer, touch (long press) and keyboard (Alt + arrows). The other
+/* The board: columns and cards, moved by pointer, touch (long press) and keyboard (Space to pick a card up,
+   arrows, Space to put it down; or Alt + arrows in one step). The other
    cards make room with FLIP, a ticked card flies to Done along an arc, sections are added, renamed, moved and
    deleted in place. Every change shows at once and is then sent to the API through `actions`; if the API
    refuses one, the caller reloads the board from the server. Changes other people make arrive through
@@ -121,6 +122,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   let lastDragEnd = 0;
   let reloadWanted = false;
   let renaming = false;
+  // A card picked up with Space: arrows move it, Space or Enter put it down, Escape puts it back.
+  let lifted: { card: HTMLElement; from: { sid: string; index: number }; origin: { parent: HTMLElement; next: Element | null } } | null = null;
   let composer: { box: HTMLElement; ta: HTMLTextAreaElement; list: HTMLElement; col: HTMLElement; where: 'top' | 'bottom' } | null = null;
   let sort: SortKey = o.sort && o.sort in SORTS ? o.sort : 'manual';
   const inbox: (() => void)[] = []; // other people's changes that arrived mid-drag, applied on drop
@@ -158,7 +161,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     <div class="bd-scroll"><div class="bd-cols"></div></div>
     <div class="bd-layer" aria-hidden="true"></div>
     <div class="bd-menu" role="menu" hidden></div>
-    <p class="sr-only" aria-live="polite" data-live></p>`;
+    <p class="sr-only" aria-live="polite" data-live></p>
+    <p class="sr-only" id="${P}-howto">Enter opens it. Space picks it up to move with the arrow keys; Space puts it down. Control Enter completes it.</p>`;
 
   const $ = (sel: string) => root.querySelector(sel) as HTMLElement;
   const scroller = $('.bd-scroll');
@@ -229,7 +233,8 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     el.className = 'bd-card';
     el.dataset.id = t.id;
     el.tabIndex = 0;
-    el.setAttribute('aria-keyshortcuts', 'Enter Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown');
+    el.setAttribute('aria-keyshortcuts', 'Enter Space Control+Enter Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown');
+    el.setAttribute('aria-describedby', `${P}-howto`);
     paint(el, t);
     return el;
   }
@@ -528,7 +533,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   let drag: Drag | null = null;
   listen(root, 'pointerdown', (ev) => {
     const e = ev as PointerEvent;
-    if (e.button !== 0 || drag) return;
+    if (e.button !== 0 || drag || lifted) return;
     const target = e.target as HTMLElement;
     if (target.closest('.bd-layer, .bd-menu')) return;
     const card = target.closest<HTMLElement>('.bd-card');
@@ -737,33 +742,93 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   listen(document, 'keydown', (ev) => {
     const e = ev as KeyboardEvent;
     if (e.key === 'Escape' && drag?.started) { e.preventDefault(); stopListening(false); cancelDrag(); }
+    // Q also works when nothing has focus yet (the page itself), not only from inside the board.
+    if (!compact && (e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey && e.target === document.body && !drag && !lifted && visible()) {
+      const first = allCols().find((c) => !c.classList.contains('is-pending'));
+      if (first) { e.preventDefault(); openComposer(first, 'top'); }
+    }
   });
-  listen(root, 'keydown', (ev) => {
-    const e = ev as KeyboardEvent;
-    const card = (e.target as HTMLElement).closest?.<HTMLElement>('.bd-card');
-    if (!card || e.target !== card) return;
-    if (e.key === 'Enter') { e.preventDefault(); if (!card.classList.contains('is-pending')) o.onOpen(card.dataset.id!); return; }
-    if (!e.altKey || !e.key.startsWith('Arrow') || card.classList.contains('is-pending')) return;
-    e.preventDefault();
-    const from = { sid: colOfCard(card), index: indexOfCard(card) };
+  // One step of a keyboard move; nothing is saved until the card is put down.
+  function step(card: HTMLElement, key: string) {
     const list = card.parentElement!;
     const siblings = [...list.querySelectorAll<HTMLElement>(':scope > .bd-card:not([hidden])')];
     const i = siblings.indexOf(card);
-    if (sort !== 'manual' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { sortedNote(); return; }
-    if (e.key === 'ArrowUp' && i > 0) list.insertBefore(card, siblings[i - 1]!);
-    else if (e.key === 'ArrowDown' && i < siblings.length - 1) list.insertBefore(card, siblings[i + 1]!.nextElementSibling);
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (sort !== 'manual' && (key === 'ArrowUp' || key === 'ArrowDown')) { sortedNote(); return false; }
+    if (key === 'ArrowUp' && i > 0) list.insertBefore(card, siblings[i - 1]!);
+    else if (key === 'ArrowDown' && i < siblings.length - 1) list.insertBefore(card, siblings[i + 1]!.nextElementSibling);
+    else if (key === 'ArrowLeft' || key === 'ArrowRight') {
       const cols = allCols().filter((c) => !c.classList.contains('is-pending'));
-      const target = cols[cols.indexOf(card.closest<HTMLElement>('.bd-col')!) + (e.key === 'ArrowRight' ? 1 : -1)];
-      if (!target) return;
+      const target = cols[cols.indexOf(card.closest<HTMLElement>('.bd-col')!) + (key === 'ArrowRight' ? 1 : -1)];
+      if (!target) return false;
       const tl = target.querySelector<HTMLElement>('.bd-list')!;
       if (sort === 'manual') tl.prepend(card); else tl.insertBefore(card, slotFor(tl, tasks.get(card.dataset.id!)!));
-    } else return;
+    } else return false;
     card.focus();
+    card.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     counts(false);
+    return true;
+  }
+  const whereIs = (card: HTMLElement) => {
+    const shown = [...card.parentElement!.querySelectorAll(':scope > .bd-card:not([hidden])')];
+    return `${sectionById(colOfCard(card))?.name}, ${shown.indexOf(card) + 1} of ${shown.length}`;
+  };
+  function lift(card: HTMLElement) {
+    closeComposer();
+    closeMenu(false);
+    lifted = { card, from: { sid: colOfCard(card), index: indexOfCard(card) }, origin: { parent: card.parentElement!, next: card.nextElementSibling } };
+    card.classList.add('is-lifted');
+    announce(`Picked up ${tasks.get(card.dataset.id!)?.title}. ${whereIs(card)}. Arrow keys move it, Space puts it down, Escape puts it back.`);
+  }
+  function putDown(cancel = false) {
+    const l = lifted;
+    if (!l) return;
+    lifted = null;
+    l.card.classList.remove('is-lifted');
+    if (cancel) {
+      l.origin.parent.insertBefore(l.card, l.origin.next?.isConnected && l.origin.next.parentElement === l.origin.parent ? l.origin.next : null);
+      l.card.focus();
+      counts(false);
+      announce('Move cancelled. The card is back where it was.');
+    } else {
+      const t = tasks.get(l.card.dataset.id!);
+      const moved = colOfCard(l.card) !== l.from.sid || indexOfCard(l.card) !== l.from.index;
+      if (t) settleCard(t, l.card, l.from);
+      if (!moved) announce('Put down. Nothing moved.');
+    }
+    for (const f of inbox.splice(0)) f();
+    flushReload();
+  }
+
+  listen(root, 'keydown', (ev) => {
+    const e = ev as KeyboardEvent;
+    const tgt = e.target as HTMLElement;
+    // Q adds a task to the top of the first section (when you aren't typing somewhere).
+    if (!compact && (e.key === 'q' || e.key === 'Q') && !e.ctrlKey && !e.metaKey && !e.altKey && !lifted && !tgt.closest?.('input, textarea, select, [contenteditable="true"]')) {
+      const first = allCols().find((c) => !c.classList.contains('is-pending'));
+      if (first) { e.preventDefault(); openComposer(first, 'top'); }
+      return;
+    }
+    const card = tgt.closest?.<HTMLElement>('.bd-card');
+    if (!card || e.target !== card || card.classList.contains('is-pending')) return;
+    if (lifted?.card === card) {
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); putDown(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); putDown(true); }
+      else if (e.key.startsWith('Arrow')) { e.preventDefault(); if (step(card, e.key)) announce(`${whereIs(card)}.`); }
+      else if (e.key === 'Tab') putDown();
+      return;
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); const t = tasks.get(card.dataset.id!); if (t) (t.completed ? untick : tick)(t); return; }
+    if (e.key === 'Enter') { e.preventDefault(); o.onOpen(card.dataset.id!); return; }
+    if (e.key === ' ' && !compact && !drag) { e.preventDefault(); lift(card); return; }
+    if (!e.altKey || !e.key.startsWith('Arrow')) return;
+    e.preventDefault();
+    const from = { sid: colOfCard(card), index: indexOfCard(card) };
+    if (!step(card, e.key)) return;
     const t = tasks.get(card.dataset.id!);
     if (t) settleCard(t, card, from);
   });
+  // A click anywhere puts a lifted card down where it is.
+  listen(document, 'pointerdown', () => { if (lifted) putDown(); }, { capture: true });
 
   // ---- inline composer: type, Enter, and it stays open for the next one
   function openComposer(col: HTMLElement, where: 'top' | 'bottom') {
@@ -1073,7 +1138,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   }
 
   // A reload never lands mid-drag, mid-rename or while the composer is open; it waits, then asks for a fresh copy.
-  const busy = () => !!drag || !!composer || renaming;
+  const busy = () => !!drag || !!composer || renaming || !!lifted;
   function flushReload() {
     if (!reloadWanted || busy()) return;
     reloadWanted = false;
@@ -1099,7 +1164,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   // ---- other people's changes
   const who = (id: string) => nameOf(id) ?? 'Someone';
   function remoteTask(s: Omit<Task, 'liked'>, actorId: string) {
-    if (drag) { inbox.push(() => remoteTask(s, actorId)); return; }
+    if (drag || lifted) { inbox.push(() => remoteTask(s, actorId)); return; }
     if (s.parentId || s.projectId !== project.id) return;
     if (pending.has(s.id) || flying.has(s.id)) { staleAfter.add(s.id); return; }
     const t = tasks.get(s.id);
@@ -1140,7 +1205,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   }
 
   function remoteRemove(id: string, actorId: string) {
-    if (drag) { inbox.push(() => remoteRemove(id, actorId)); return; }
+    if (drag || lifted) { inbox.push(() => remoteRemove(id, actorId)); return; }
     const t = tasks.get(id);
     if (!t) return;
     staleAfter.delete(id);

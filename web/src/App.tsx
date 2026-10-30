@@ -60,6 +60,10 @@ export function App() {
   if (path === '/signin') {
     return session && !leaving ? <Redirect to={safeNext(new URLSearchParams(search).get('next'))} /> : <SignIn onSignedIn={signedIn} username={new URLSearchParams(search).get('u') ?? ''} />;
   }
+  if (path === '/people') {
+    if (!session) return <Redirect to="/signin?next=%2Fpeople" />;
+    return <Workspace session={session} view="people" projectId={null} taskId={null} onSignOut={signOut} />;
+  }
   const m = path!.match(BOARD);
   if (path === '/board' || m) {
     if (!session) return <Redirect to={`/signin?next=${encodeURIComponent(path!)}`} />;

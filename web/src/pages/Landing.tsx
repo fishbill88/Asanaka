@@ -312,7 +312,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
       </main>
 
       <footer className="foot gutter">
-        <div className="mark" aria-label="Asanaka">{[...'Asanaka'].map((c, i) => <span key={i} aria-hidden="true">{c}</span>)}</div>
+        <div className="mark" role="img" aria-label="Asanaka">{[...'Asanaka'].map((c, i) => <span key={i} aria-hidden="true">{c}</span>)}</div>
         <div className="foot-links">
           <div className="foot-col"><h3>On this page</h3><ul><li><a className="link" href="#where">Where</a></li><li><a className="link" href="#how">How it moves</a></li><li><a className="link" href="#close">Up close</a></li></ul></div>
           <div className="foot-col"><h3>The board</h3><ul><li><a className="link" href={href(to)} onClick={go}>{signedIn ? 'Open the board' : 'Sign in'}</a></li><li>Enter opens a card</li><li>Alt and arrows move it</li></ul></div>

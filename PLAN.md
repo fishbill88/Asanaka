@@ -59,9 +59,20 @@ We copy Asana's board interactions, not its name, logo or artwork.
 - The task feed: Comments, or All activity with the changes woven in, oldest first; it refreshes when someone
   else changes the task.
 
-**v1.1, phase 7**: admin users page, multi-select drag, keyboard shortcuts (`Tab+Q` quick add, `Tab+Enter` complete).
+**v1.1, phase 7 (added 30 Oct 2026)**
+- People, for admins (`/people`): add a person, rename them, make them an admin or a member, turn them off and
+  on, reset a password. A new password is made on the server and shown once. The `admin` account itself is
+  never reset or turned off there, since its password rotates on the box.
+- Change password, for everyone except `admin`: needs the current password; other sessions end, this one stays.
+- Keyboard: Space picks a card up, the arrow keys move it, Space or Enter puts it down, Escape puts it back
+  (Alt + arrows still moves in one step). Ctrl or Cmd + Enter completes the focused card or the open task.
+  Q adds a task to the top of the first section. Asana's Tab+Q and Tab+Enter became Q and Ctrl+Enter, because
+  Tab has to keep moving focus.
+- Phone: your avatar in the top bar opens People, Change password and Sign out. The sign-in circle moves to
+  the top corner so the form stays readable.
+- Reduced motion: nothing on the board moves, the tick mark and the landing caret included.
 
-**Later**: list, timeline and calendar views, attachments, custom fields, notifications.
+**Later**: multi-select drag (moved out of phase 7), list, timeline and calendar views, custom fields, notifications.
 
 ## 3. Architecture
 
@@ -148,7 +159,8 @@ Indexes: `tasks (section_id, position) where deleted_at is null and parent_id is
 | `POST /tasks/:id/subtasks` · `POST /tasks/:id/comments` · `PUT/DELETE /tasks/:id/like` | |
 | `POST /tasks/:id/attachments?name=&type=` · `GET/DELETE /attachments/:id` | upload raw bytes (10 MB), download (always as a sandboxed attachment), remove |
 | `GET /projects/:id/events?client=<tab>` | server-sent events: `task` (a card as everyone sees it), `task-removed`, `board` (sections or the project changed); never the changes this tab made. A heartbeat every 25 s also ends the stream if the session has ended |
-| `GET/POST /admin/users` · `POST /admin/users/:id/password` | admin only (phase 7) |
+| `GET/POST /admin/users` · `PATCH /admin/users/:id` · `POST /admin/users/:id/password` | admins only: list with last seen; add (returns a password once); rename, role, turn off or on (off ends their sessions); reset (a new password once, every session ends). Never the `admin` account's password, never yourself |
+| `POST /me/password` | `{current, next}`, 10 characters or more; ends your other sessions; not for `admin` |
 | `GET /healthz` | liveness for Docker and the deploy script |
 
 Moves are last-write-wins on one row. The client sends the new `position` key computed between its
@@ -172,7 +184,7 @@ this particular password: `$$` inside a double-quoted shell string expands to a 
 a compose `.env` it collapses to a single `$`. Stdin carries it byte for byte.
 
 The given password is short and common. Lockout and rate limits protect it, but it should change
-after the first sign-in (the admin users page in phase 7 can do it).
+after the first sign-in: Change password, under the name in the sidebar (or the avatar menu on a phone).
 
 ## 8. Where secrets live
 
