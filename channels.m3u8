@@ -1,0 +1,41 @@
+#EXTM3U
+# TIBI's built-in line-up. Every stream here is published free by the broadcaster itself, for anyone
+# to watch on the web. Re-streams of paid channels do not belong here, whoever hosts them, and
+# neither do FAST-platform relays (Xumo, Samsung TV Plus, Rakuten), which are licensed to those apps.
+# Checked 2026-11-03 by playing each one in Edge through this player page (hls.js). Dropped then:
+# NASA TV (403 - NASA moved to NASA+) and CGTN (its variant host sends no CORS header).
+# HTTPS only: the player page is https, so an http stream would be blocked as mixed content.
+#
+# Philippines, checked 2026-11-03. Kept only where the stream is provably the broadcaster's own:
+# CLTV 36 is served from cltv36.tv, and FilAmTV / Living Asia / Mindanow are the exact addresses
+# VegasPlus (their network) embeds on vegasplus.us. Abante TV, Bilyonaryo, INC TV, SMNI and Hope
+# Channel PH also play, but nothing on their own sites ties those addresses to them, so they are
+# out until one does. GMA, ABS-CBN, TV5 and PTV publish no open stream (YouTube/Facebook/paid apps).
+#EXTINF:-1 group-title="Philippines",CLTV 36
+https://live.cltv36.tv:5443/LiveApp/streams/cltvlive.m3u8
+#EXTINF:-1 group-title="Philippines",FilAmTV
+https://cdn.vegasplus.us/vegas/ftv/playlist.m3u8
+#EXTINF:-1 group-title="Philippines",Living Asia Channel
+https://cdn.vegasplus.us/vegas/lac/playlist.m3u8
+#EXTINF:-1 group-title="Philippines",Mindanow Network TV
+https://cdn.vegasplus.us/vegas/mmn01/playlist.m3u8
+#EXTINF:-1 group-title="News",CBS News 24/7
+https://cbsn-us.cbsnstream.cbsnews.com/out/v1/55a8648e8f134e82a470f83d562deeca/master.m3u8
+#EXTINF:-1 group-title="News",Bloomberg
+https://www.bloomberg.com/media-manifest/streams/us.m3u8
+#EXTINF:-1 group-title="News",Al Jazeera English
+https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8
+#EXTINF:-1 group-title="News",DW English
+https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8
+#EXTINF:-1 group-title="News",France 24 English
+https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_5000.m3u8
+#EXTINF:-1 group-title="News",NHK World-Japan
+https://masterpl.hls.nhkworld.jp/hls/w/live/smarttv.m3u8
+#EXTINF:-1 group-title="News",CNA
+https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43aeb4a48ec97f66ebbe/index.m3u8
+#EXTINF:-1 group-title="News",TRT World
+https://tv-trtworld.medya.trt.com.tr/master.m3u8
+#EXTINF:-1 group-title="Culture",Arirang
+https://amdlive-ch01-ctnd-com.akamaized.net/arirang_1ch/smil:arirang_1ch.smil/playlist.m3u8
+#EXTINF:-1 group-title="Sports",Red Bull TV
+https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8
