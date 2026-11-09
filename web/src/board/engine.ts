@@ -21,6 +21,8 @@ export interface BoardActions {
   renameSection(id: string, name: string): Promise<Section>;
   moveSection(id: string, index: number): Promise<Section>;
   deleteSection(id: string): Promise<unknown>;
+  /** Only given to admins; without it the project's name is read-only. */
+  renameProject?(name: string): Promise<Project>;
 }
 
 export interface Cheer { card: HTMLElement; task: Task; layer: HTMLElement; x: number; y: number }
@@ -37,6 +39,8 @@ export interface EngineOptions {
   /** The board and the server disagree about where something is: reload quietly. */
   onStale(): void;
   onSections?(sections: Section[]): void;
+  /** The project's name changed here (shown at once, before the server has it). */
+  onProject?(project: Project): void;
   /** How cards are ordered inside each section; the caller remembers the choice. */
   sort?: SortKey;
   onSort?(sort: SortKey): void;
@@ -73,6 +77,7 @@ const ICON = {
   clip: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 7.5l-6.8 6.8a2 2 0 0 0 2.8 2.8l7.1-7.1a4 4 0 0 0-5.7-5.7l-7.1 7.1a6 6 0 0 0 8.5 8.5l5.3-5.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   thumb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 11v9h-3v-9h3zm0 9h9.2a2 2 0 0 0 2-1.6l1.2-6.1a2 2 0 0 0-2-2.3h-4.5l.8-3.6a1.8 1.8 0 0 0-3.3-1.4L7.5 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   sort: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M3.5 15.5L7 19l3.5-3.5M17 19V5M13.5 8.5L17 5l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pencil: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 19.5l1-4.2L15.8 5a2.1 2.1 0 0 1 3 3L8.5 18.4l-4 1.1zM13.8 7l3.2 3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
 const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 
@@ -146,6 +151,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     <div class="bd-top">
       <div class="bd-proj">
         <h1 class="bd-proj-name"></h1>
+        ${o.actions.renameProject ? `<button type="button" class="bd-proj-edit" aria-label="Rename project">${ICON.pencil}</button>` : ''}
         <div class="bd-people" aria-label="People"></div>
       </div>
       <div class="bd-tools">
@@ -975,6 +981,48 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     input.addEventListener('blur', () => finish(true));
   }
 
+  // Admins only: the project's name turns into a field in place, like a section's.
+  function renameProject() {
+    const save = o.actions.renameProject;
+    const h = root.querySelector<HTMLElement>('.bd-proj-name');
+    if (!save || !h || renaming) return;
+    const input = document.createElement('input');
+    input.className = 'bd-proj-rename';
+    input.value = project.name;
+    input.maxLength = 120;
+    input.setAttribute('aria-label', 'Project name');
+    // The field grows with the name, so the toolbar beside it doesn't jump to the next line.
+    const fit = () => { input.style.width = `${Math.max(input.value.length, 8) + 3}ch`; };
+    fit();
+    input.addEventListener('input', fit);
+    h.replaceWith(input);
+    input.focus();
+    input.select();
+    renaming = true;
+    let finished = false;
+    const finish = (keep: boolean) => {
+      if (finished) return;
+      finished = true;
+      renaming = false;
+      const name = input.value.trim().replace(/\s+/g, ' ');
+      input.replaceWith(h);
+      if (keep && name && name !== project.name) {
+        project.name = name;
+        h.textContent = name;
+        o.onProject?.({ ...project });
+        announce(`Project renamed to ${name}.`);
+        persist(save(name));
+      }
+      root.querySelector<HTMLElement>('.bd-proj-edit')?.focus();
+      flushReload();
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+  }
+
   function shiftSection(col: HTMLElement, dir: -1 | 1) {
     const cols = allCols();
     const i = cols.indexOf(col), j = i + dir;
@@ -1103,6 +1151,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
     if (more) { openMenu(more); return; }
     const sortBtn = tgt.closest<HTMLElement>('.bd-sort');
     if (sortBtn) { openSortMenu(sortBtn); return; }
+    if (tgt.closest('.bd-proj-edit')) { renameProject(); return; }
     if (tgt.closest('[data-act="add-top"]')) { const first = allCols()[0]; if (first) openComposer(first, 'top'); return; }
     if (tgt.closest('[data-act="compose-add"]')) { addFromComposer(); return; }
     if (tgt.closest('[data-act="compose-cancel"]')) { closeComposer(true); return; }
@@ -1116,6 +1165,7 @@ export function mountBoard(root: HTMLElement, o: EngineOptions): BoardEngine {
   listen(root, 'dblclick', (e) => {
     const h = (e.target as HTMLElement).closest('.bd-col-name');
     if (h && !compact) renameSection(h.closest<HTMLElement>('.bd-col')!);
+    else if ((e.target as HTMLElement).closest('.bd-proj-name')) renameProject();
   });
 
   // ---- for the React side

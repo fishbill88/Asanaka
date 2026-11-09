@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, api, messageOf } from '../lib/api';
 import { connectLive } from '../lib/live';
 import { follow, href, navigate } from '../lib/router';
-import type { Board, Section } from '../types';
+import type { Board, Project, Section } from '../types';
 import { pinCelebration } from './celebrate';
 import { SORTS, mountBoard, type BoardEngine, type SortKey } from './engine';
 import { TaskPane } from './TaskPane';
@@ -11,7 +11,10 @@ interface Props {
   projectId: string;
   taskId: string | null;
   me: string;
+  /** Admins may rename the project from its title. */
+  canRename?: boolean;
   onBoard(b: Board): void;
+  onProject?(p: Project): void;
 }
 
 // One project's board. The engine owns the columns and cards; this component loads the data, turns the
@@ -26,7 +29,7 @@ function savedSort(projectId: string): SortKey {
 function saveSort(projectId: string, k: SortKey) {
   try { if (k === 'manual') localStorage.removeItem(sortKey(projectId)); else localStorage.setItem(sortKey(projectId), k); } catch { /* storage blocked: lasts this visit */ }
 }
-export function BoardView({ projectId, taskId, me, onBoard }: Props) {
+export function BoardView({ projectId, taskId, me, canRename = false, onBoard, onProject }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const band = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<BoardEngine | null>(null);
@@ -41,6 +44,8 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
   const reloadRef = useRef<() => void>(() => {});
   const onBoardRef = useRef(onBoard);
   useEffect(() => { onBoardRef.current = onBoard; }, [onBoard]);
+  const onProjectRef = useRef(onProject);
+  useEffect(() => { onProjectRef.current = onProject; }, [onProject]);
 
   // A refused change: say why, then show the board as the server has it.
   const fail = useCallback((err: unknown) => {
@@ -82,11 +87,13 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
           renameSection: (id, name) => api.updateSection(id, { name }).then((r) => r.section),
           moveSection: (id, index) => api.updateSection(id, { index }).then((r) => r.section),
           deleteSection: (id) => api.deleteSection(id),
+          ...(canRename ? { renameProject: (name: string) => api.renameProject(projectId, name).then((r) => { onProjectRef.current?.(r.project); return r.project; }) } : {}),
         },
         onOpen: (id) => navigate(`/p/${projectId}/t/${id}`),
         onFailure: fail,
         onStale: () => { void reload(); },
         onSections: setSections,
+        onProject: (p) => onProjectRef.current?.(p),
         sort: savedSort(projectId),
         onSort: (k) => saveSort(projectId, k),
         celebrate: cheer.celebrate,
@@ -126,7 +133,7 @@ export function BoardView({ projectId, taskId, me, onBoard }: Props) {
       eng?.destroy();
       setEngine(null);
     };
-  }, [projectId, me, fail]);
+  }, [projectId, me, canRename, fail]);
 
   // The URL says which task is open; the pane stays mounted while it slides out.
   useEffect(() => { if (taskId) setPaneId(taskId); }, [taskId]);

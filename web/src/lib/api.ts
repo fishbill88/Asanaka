@@ -60,6 +60,7 @@ export const api = {
 
   projects: () => request<{ projects: Project[] }>('GET', '/api/projects'),
   createProject: (name: string) => write<{ project: Project }>('POST', '/api/projects', { name }),
+  renameProject: (id: string, name: string) => write<{ project: Project }>('PATCH', `/api/projects/${id}`, { name }),
   board: (projectId: string) => request<Board>('GET', `/api/projects/${projectId}/board`),
 
   createSection: (projectId: string, name: string) => write<{ section: Section }>('POST', `/api/projects/${projectId}/sections`, { name }),

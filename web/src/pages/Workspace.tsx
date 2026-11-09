@@ -49,6 +49,10 @@ export function Workspace({ session, view = 'board', projectId, taskId, onSignOu
     setProjects((ps) => ps?.map((p) => (p.id === b.project.id ? b.project : p)) ?? ps);
   }, []);
 
+  const onProject = useCallback((p: Project) => {
+    setProjects((ps) => ps?.map((x) => (x.id === p.id ? { ...x, name: p.name } : x)) ?? ps);
+  }, []);
+
   const createProject = async (e: FormEvent) => {
     e.preventDefault();
     const n = name.trim().replace(/\s+/g, ' ');
@@ -143,7 +147,7 @@ export function Workspace({ session, view = 'board', projectId, taskId, onSignOu
         ) : error && !projects ? (
           <div className="board-state"><p>{error}</p></div>
         ) : projectId ? (
-          <BoardView key={projectId} projectId={projectId} taskId={taskId} me={me.id} onBoard={onBoard} />
+          <BoardView key={projectId} projectId={projectId} taskId={taskId} me={me.id} canRename={isAdmin} onBoard={onBoard} onProject={onProject} />
         ) : projects && projects.length === 0 ? (
           <div className="board-state">
             <p>There are no projects yet.</p>

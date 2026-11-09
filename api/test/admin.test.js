@@ -77,3 +77,16 @@ test('anyone changes their own password with the current one; other sessions end
   assert.ok(await t.login('ameer', 'a-much-longer-one'));
   assert.equal((await call(admin, 'POST', '/api/me/password', { current: PASS.admin, next: 'a-much-longer-one' })).body.error, 'rotated');
 });
+
+test('only an admin renames a project; members still reorder it', async () => {
+  const p = (await call(ameer, 'POST', '/api/projects', { name: 'Launch' })).body.project;
+  const refused = await call(ameer, 'PATCH', `/api/projects/${p.id}`, { name: 'Mine now' });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.body.error, 'not-admin');
+  assert.equal((await call(ameer, 'PATCH', `/api/projects/${p.id}`, { index: 0 })).status, 200, 'other fields stay open');
+  const renamed = await call(admin, 'PATCH', `/api/projects/${p.id}`, { name: '  Launch week  ' });
+  assert.equal(renamed.status, 200);
+  assert.equal(renamed.body.project.name, 'Launch week');
+  assert.equal((await call(admin, 'PATCH', `/api/projects/${p.id}`, { name: '' })).status, 400, 'a name can’t be empty');
+  assert.equal((await call(admin, 'PATCH', `/api/projects/${p.id}`, { name: '   ' })).status, 400, 'or only spaces');
+});

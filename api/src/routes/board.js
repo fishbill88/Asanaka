@@ -107,8 +107,10 @@ export default function boardRoutes(app, { db, live }) {
       body: { type: 'object', additionalProperties: false, minProperties: 1, properties: { name, color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$' }, index, doneSectionId: nullable(uuid) } },
     },
   }, async (req) => db.tx(async (t) => {
-    const p = await loadProject(t, req.params.id, true);
     const b = req.body;
+    if (b.name !== undefined && req.user.role !== 'admin') throw new HttpError(403, 'not-admin', 'Only an admin can rename a project.');
+    if (b.name !== undefined && !b.name.trim()) throw new HttpError(400, 'empty-name', 'A project needs a name.');
+    const p = await loadProject(t, req.params.id, true);
     if (b.doneSectionId) {
       const s = await loadSection(t, b.doneSectionId);
       if (s.project_id !== p.id) throw new HttpError(400, 'wrong-project', 'That section belongs to another project.');

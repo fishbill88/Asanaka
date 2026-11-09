@@ -63,6 +63,8 @@ We copy Asana's board interactions, not its name, logo or artwork.
 - People, for admins (`/people`): add a person, rename them, make them an admin or a member, turn them off and
   on, reset a password. A new password is made on the server and shown once. The `admin` account itself is
   never reset or turned off there, since its password rotates on the box.
+- Project names, for admins: the pencil beside the project's title (or a double-click on it) turns the name into
+  a field; Enter saves, Escape keeps the old one. Members don't see the pencil, and the API refuses their renames.
 - Change password, for everyone except `admin`: needs the current password; other sessions end, this one stays.
 - Keyboard: Space picks a card up, the arrow keys move it, Space or Enter puts it down, Escape puts it back
   (Alt + arrows still moves in one step). Ctrl or Cmd + Enter completes the focused card or the open task.
