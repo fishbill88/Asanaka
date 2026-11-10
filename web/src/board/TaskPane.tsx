@@ -3,6 +3,7 @@ import { ApiError, api, deleteAttachment, messageOf, uploadAttachment, type Task
 import type { Activity, Attachment, Board, Comment, Priority, Section, Status, Task, TaskDetail } from '../types';
 import { FileTile, Lightbox, NotesView, markerFor, openAttachment } from './Attachments';
 import type { BoardEngine } from './engine';
+import { Linkify } from './Linkify';
 import { PRIORITY, STATUS, initials, toneOf, when } from './format';
 import { EASE_OUT, reduced } from './motion';
 
@@ -492,7 +493,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
                   <Avatar board={board} id={item.c.authorId} />
                   <div>
                     <p className="pane-comment-by"><strong>{userName(item.c.authorId)}</strong> <span>{when(item.c.createdAt)}</span></p>
-                    <p className="pane-comment-body">{item.c.body}</p>
+                    <p className="pane-comment-body"><Linkify text={item.c.body} /></p>
                   </div>
                 </li>
               ) : (
