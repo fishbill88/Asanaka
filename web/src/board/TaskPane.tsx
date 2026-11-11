@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type FormEvent } from 'react';
 import { ApiError, api, deleteAttachment, messageOf, uploadAttachment, type TaskFields } from '../lib/api';
 import type { Activity, Attachment, Board, Comment, Priority, Section, Status, Task, TaskDetail } from '../types';
-import { FileTile, Lightbox, NotesView, markerFor, openAttachment } from './Attachments';
+import { FileTile, Lightbox, NotesView, UPLOADING, markerFor, openAttachment } from './Attachments';
 import type { BoardEngine } from './engine';
-import { Linkify } from './Linkify';
 import { PRIORITY, STATUS, initials, toneOf, when } from './format';
 import { EASE_OUT, reduced } from './motion';
 
@@ -77,6 +76,10 @@ function feedOf(feed: Feed, comments: Comment[], activity: Activity[]): FeedItem
 let tmp = 0;
 const tempId = () => `tmp-pane-${++tmp}`;
 const hasFiles = (e: DragEvent) => [...e.dataTransfer.types].includes('Files');
+const filesIn = (data: DataTransfer | null) => [...(data?.files ?? [])];
+
+/** A text field files can be pasted into: the description, the comment box, or a comment being edited. */
+interface Slot { get(): string; set(v: string): void; settled?(v: string): void }
 
 export function TaskPane({ taskId, open, engine, board, sections, me, onClose, onClosed, onFailure, onNotice, remote }: Props) {
   const pane = useRef<HTMLElement>(null);
@@ -91,7 +94,16 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   const notesLive = useRef('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [newSub, setNewSub] = useState('');
-  const [say, setSay] = useState('');
+  const [say, setSayState] = useState('');
+  const sayLive = useRef('');
+  const sayRef = useRef<HTMLTextAreaElement>(null);
+  const sayFiles = useRef<HTMLInputElement>(null);
+  const [sayDrop, setSayDrop] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editText, setEditTextState] = useState('');
+  const editLive = useRef('');
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const [confirmComment, setConfirmComment] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [uploading, setUploading] = useState(0);
   const [dropping, setDropping] = useState(false);
@@ -101,6 +113,8 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   const t = task ?? detail?.task;
   const setFeed = (v: Feed) => { setFeedState(v); try { localStorage.setItem(FEED_KEY, v); } catch { /* lasts this visit */ } };
   const setNotes = useCallback((v: string) => { notesLive.current = v; setNotesState(v); }, []);
+  const setSay = useCallback((v: string) => { sayLive.current = v; setSayState(v); }, []);
+  const setEditText = useCallback((v: string) => { editLive.current = v; setEditTextState(v); }, []);
 
   // Slide in on the next frame (so the closed position is painted first); slide out, then unmount.
   useEffect(() => {
@@ -122,6 +136,8 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     setConfirmDelete(false);
     setNewSub('');
     setViewing(null);
+    setEditing(null);
+    setConfirmComment(null);
     load().then((d) => {
       if (!alive) return;
       setDetail(d);
@@ -167,7 +183,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       // Ctrl (or Cmd) + Enter completes the task, except in the comment box, where it posts.
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.defaultPrevented && !(e.target as HTMLElement).closest?.('#pane-say')) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.defaultPrevented && !(e.target as HTMLElement).closest?.('#pane-say, .pane-comment-edit')) {
         e.preventDefault();
         engine.toggle(taskId);
         return;
@@ -206,19 +222,28 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   // Files: each upload adds a tile; files pasted or dropped into the description also leave a marker there,
   // first "Uploading…", then the image or file itself. The description saves once it holds no pending marker.
   const countFiles = (delta: number) => engine.patch(taskId, { attachmentCount: Math.max(0, (engine.get(taskId)?.attachmentCount ?? 0) + delta) });
-  const replaceInNotes = (from: string, to: string) => {
-    const next = notesLive.current.replace(from, to).replace(/\n{3,}/g, '\n\n');
-    setNotes(next);
-    if (document.activeElement !== notesRef.current && !next.includes('](uploading:') && next !== engine.get(taskId)?.notes) saveFields({ notes: next });
+  const notesSlot: Slot = {
+    get: () => notesLive.current,
+    set: setNotes,
+    settled: (next) => {
+      if (document.activeElement !== notesRef.current && !next.includes(UPLOADING) && next !== engine.get(taskId)?.notes) saveFields({ notes: next });
+    },
   };
-  const sendFiles = (files: File[], into?: { at: number }) => {
+  const saySlot: Slot = { get: () => sayLive.current, set: setSay };
+  const editSlot: Slot = { get: () => editLive.current, set: setEditText };
+  const replaceIn = (slot: Slot, from: string, to: string) => {
+    const next = slot.get().replace(from, to).replace(/\n{3,}/g, '\n\n');
+    slot.set(next);
+    slot.settled?.(next);
+  };
+  const sendFiles = (files: File[], into?: { at: number; slot: Slot }) => {
     if (!files.length) return;
     const tokens = files.map((f) => `[Uploading ${(f.name && f.name !== 'image.png' ? f.name : 'pasted image').replace(/[[\]\n]/g, '')}…](uploading:${tempId()})`);
     if (into) {
-      const cur = notesLive.current;
+      const cur = into.slot.get();
       const before = cur.slice(0, into.at), after = cur.slice(into.at);
       const pad = (s: string, side: 'start' | 'end') => (s && !(side === 'start' ? s.endsWith('\n') : s.startsWith('\n')) ? '\n' : '');
-      setNotes(`${before}${pad(before, 'start')}${tokens.join('\n')}${pad(after, 'end')}${after}`);
+      into.slot.set(`${before}${pad(before, 'start')}${tokens.join('\n')}${pad(after, 'end')}${after}`);
     }
     files.forEach((file, i) => {
       setUploading((n) => n + 1);
@@ -226,9 +251,9 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
       req.then((a) => {
         setDetail((d) => d && { ...d, attachments: d.attachments.some((x) => x.id === a.id) ? d.attachments : [...d.attachments, a] });
         countFiles(1);
-        if (into) replaceInNotes(tokens[i]!, markerFor(a));
+        if (into) replaceIn(into.slot, tokens[i]!, markerFor(a));
       }, (err) => {
-        if (into) replaceInNotes(tokens[i]!, '');
+        if (into) replaceIn(into.slot, tokens[i]!, '');
         onNotice(messageOf(err));
       }).finally(() => setUploading((n) => n - 1));
       refreshSoon(req);
@@ -244,7 +269,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   };
   const commitNotes = () => {
     const v = notesLive.current;
-    if (v !== t.notes && !v.includes('](uploading:')) saveFields({ notes: v });
+    if (v !== t.notes && !v.includes(UPLOADING)) saveFields({ notes: v });
   };
 
   const sectionName = (id: unknown) => sections.find((s) => s.id === id)?.name ?? 'another section';
@@ -280,8 +305,8 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
 
   const postComment = (e?: FormEvent) => {
     e?.preventDefault();
-    const body = say.trim();
-    if (!body) return;
+    const body = sayLive.current.trim();
+    if (!body || body.includes(UPLOADING)) return;
     const id = tempId();
     const draft: Comment = { id, body, authorId: me, createdAt: new Date().toISOString(), editedAt: null };
     setDetail((d) => d && { ...d, comments: [...d.comments, draft] });
@@ -291,6 +316,36 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     req.then((r) => setDetail((d) => d && { ...d, comments: d.comments.map((x) => (x.id === id ? r.comment : x)) }), onFailure);
     refreshSoon(req);
     requestAnimationFrame(() => pane.current?.querySelector('.pane-comments li:last-child')?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }));
+  };
+
+  // Your own comments can be edited; yours, or anyone's if you're an admin, can be deleted.
+  const isAdmin = board.users.find((u) => u.id === me)?.role === 'admin';
+  const startEdit = (c: Comment) => {
+    setConfirmComment(null);
+    setEditText(c.body);
+    setEditing(c.id);
+  };
+  const saveEdit = (e?: FormEvent) => {
+    e?.preventDefault();
+    const c = comments.find((x) => x.id === editing);
+    const body = editLive.current.trim();
+    if (!c) { setEditing(null); return; }
+    if (!body || body.includes(UPLOADING)) return;
+    setEditing(null);
+    if (body === c.body) return;
+    setDetail((d) => d && { ...d, comments: d.comments.map((x) => (x.id === c.id ? { ...x, body, editedAt: new Date().toISOString() } : x)) });
+    const req = api.editComment(c.id, body);
+    req.then((r) => setDetail((d) => d && { ...d, comments: d.comments.map((x) => (x.id === c.id ? r.comment : x)) }), onFailure);
+    refreshSoon(req);
+  };
+  const removeComment = (c: Comment) => {
+    setConfirmComment(null);
+    if (editing === c.id) setEditing(null);
+    setDetail((d) => d && { ...d, comments: d.comments.filter((x) => x.id !== c.id) });
+    engine.patch(taskId, { commentCount: Math.max(0, t.commentCount - 1) });
+    const req = api.deleteComment(c.id);
+    req.catch(onFailure);
+    refreshSoon(req);
   };
 
   const removeFile = (a: Attachment) => {
@@ -319,12 +374,11 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
   };
 
   // Pasting or dropping files into the description uploads them where the caret is.
-  const filesIn = (data: DataTransfer | null) => [...(data?.files ?? [])];
   const onNotesPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = filesIn(e.clipboardData);
     if (!files.length) return;
     e.preventDefault();
-    sendFiles(files, { at: e.currentTarget.selectionStart ?? notesLive.current.length });
+    sendFiles(files, { at: e.currentTarget.selectionStart ?? notesLive.current.length, slot: notesSlot });
   };
   const onNotesDrop = (e: DragEvent<HTMLElement>) => {
     const files = filesIn(e.dataTransfer);
@@ -334,7 +388,32 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
     setDropping(false);
     const at = e.currentTarget === notesRef.current ? notesRef.current.selectionStart ?? notesLive.current.length : notesLive.current.length;
     setEditingNotes(true);
-    sendFiles(files, { at });
+    sendFiles(files, { at, slot: notesSlot });
+  };
+
+  // The same for the comment box and a comment being edited.
+  const caret = (ta: HTMLTextAreaElement | null, slot: Slot) => ta?.selectionStart ?? slot.get().length;
+  const pasteInto = (slot: Slot) => (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = filesIn(e.clipboardData);
+    if (!files.length) return;
+    e.preventDefault();
+    sendFiles(files, { at: caret(e.currentTarget, slot), slot });
+  };
+  const dropInto = (slot: Slot, ta: () => HTMLTextAreaElement | null) => (e: DragEvent<HTMLElement>) => {
+    const files = filesIn(e.dataTransfer);
+    setSayDrop(false);
+    if (!files.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropping(false);
+    sendFiles(files, { at: caret(ta(), slot), slot });
+  };
+  const dragOverText = (e: DragEvent<HTMLElement>, mark?: () => void) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDropping(false);
+    mark?.();
   };
 
   const seg = <V extends string>(label: string, field: 'priority' | 'status', options: Record<V, string>, value: V | null) => (
@@ -455,7 +534,7 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
             <ul className="pane-files">
               {attachments.map((a) => <FileTile key={a.id} a={a} onOpen={() => open_(a)} onRemove={() => removeFile(a)} />)}
             </ul>
-          ) : !uploading && detail && <p className="pane-empty">Drop files on this panel, or paste an image into the description.</p>}
+          ) : !uploading && detail && <p className="pane-empty">Drop files on this panel, or paste an image into the description or a comment.</p>}
         </div>
 
         <div className="pane-block">
@@ -491,9 +570,47 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
               {feedOf(feed, comments, detail.activity).map((item) => item.kind === 'comment' ? (
                 <li key={`c-${item.c.id}`} className="pane-comment">
                   <Avatar board={board} id={item.c.authorId} />
-                  <div>
-                    <p className="pane-comment-by"><strong>{userName(item.c.authorId)}</strong> <span>{when(item.c.createdAt)}</span></p>
-                    <p className="pane-comment-body"><Linkify text={item.c.body} /></p>
+                  <div className="pane-comment-main">
+                    <p className="pane-comment-by">
+                      <strong>{userName(item.c.authorId)}</strong> <span>{when(item.c.createdAt)}</span>
+                      {item.c.editedAt && <span className="pane-comment-edited">(edited)</span>}
+                      {!item.c.id.startsWith('tmp-') && editing !== item.c.id && (item.c.authorId === me || isAdmin) && (
+                        <span className="pane-comment-acts">
+                          {item.c.authorId === me && <button type="button" className="pane-comment-act" onClick={() => startEdit(item.c)}>Edit</button>}
+                          <button type="button" className="pane-comment-act" aria-expanded={confirmComment === item.c.id}
+                            onClick={() => setConfirmComment(confirmComment === item.c.id ? null : item.c.id)}>Delete</button>
+                        </span>
+                      )}
+                    </p>
+                    {editing === item.c.id ? (
+                      <form className="pane-comment-edit" onSubmit={saveEdit}
+                        onDragOver={(e) => dragOverText(e)} onDrop={dropInto(editSlot, () => editRef.current)}>
+                        <label className="sr-only" htmlFor={`pane-edit-${item.c.id}`}>Edit comment</label>
+                        <textarea id={`pane-edit-${item.c.id}`} ref={editRef} rows={3} maxLength={10000} value={editText} autoFocus
+                          onFocus={(e) => { const n = e.currentTarget.value.length; e.currentTarget.setSelectionRange(n, n); }}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onPaste={pasteInto(editSlot)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveEdit(); }
+                            if (e.key === 'Escape') { e.preventDefault(); setEditing(null); }
+                          }} />
+                        <div className="pane-comment-edit-row">
+                          <button type="submit" className="bd-btn" disabled={!editText.trim() || editText.includes(UPLOADING)}>
+                            {editText.includes(UPLOADING) ? 'Uploading…' : 'Save'}
+                          </button>
+                          <button type="button" className="bd-btn-quiet" onClick={() => setEditing(null)}>Cancel</button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="pane-comment-body"><NotesView text={item.c.body} attachments={attachments} onOpen={open_} links /></div>
+                    )}
+                    {confirmComment === item.c.id && (
+                      <div className="pane-comment-confirm" role="group" aria-label="Delete this comment?">
+                        <span>Delete this comment?</span>
+                        <button type="button" className="bd-btn is-danger" onClick={() => removeComment(item.c)}>Delete</button>
+                        <button type="button" className="bd-btn-quiet" onClick={() => setConfirmComment(null)}>Keep</button>
+                      </div>
+                    )}
                   </div>
                 </li>
               ) : (
@@ -522,13 +639,20 @@ export function TaskPane({ taskId, open, engine, board, sections, me, onClose, o
         </div>
       </div>
 
-      <form className="pane-say" onSubmit={postComment}>
+      <form className={`pane-say${sayDrop ? ' is-dropping' : ''}`} onSubmit={postComment}
+        onDragOver={(e) => dragOverText(e, () => setSayDrop(true))}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setSayDrop(false); }}
+        onDrop={dropInto(saySlot, () => sayRef.current)}>
         <Avatar board={board} id={me} />
         <label className="sr-only" htmlFor="pane-say">Comment</label>
-        <textarea id="pane-say" rows={1} maxLength={10000} placeholder="Write a comment" value={say}
+        <textarea id="pane-say" ref={sayRef} rows={1} maxLength={10000} placeholder="Write a comment" value={say}
           onChange={(e) => setSay(e.target.value)}
+          onPaste={pasteInto(saySlot)}
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) postComment(); }} />
-        <button type="submit" className="bd-btn">Comment</button>
+        <button type="button" className="pane-say-clip" aria-label="Attach files to your comment" onClick={() => sayFiles.current?.click()}><Clip /></button>
+        <input ref={sayFiles} type="file" multiple hidden
+          onChange={(e) => { sendFiles([...(e.target.files ?? [])], { at: caret(sayRef.current, saySlot), slot: saySlot }); e.target.value = ''; sayRef.current?.focus(); }} />
+        <button type="submit" className="bd-btn" disabled={say.includes(UPLOADING)}>{say.includes(UPLOADING) ? 'Uploading…' : 'Comment'}</button>
       </form>
 
       {dropping && <div className="pane-drop" aria-hidden="true"><span>Drop to attach</span></div>}

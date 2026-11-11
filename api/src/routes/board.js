@@ -350,6 +350,43 @@ export default function boardRoutes(app, { db, live }) {
     return reply.code(201).send({ comment: { id: c.id, body: c.body, authorId: c.author_id, createdAt: c.created_at, editedAt: null } });
   }));
 
+  // Editing a comment is for the person who wrote it; deleting is for them or an admin. Files the comment
+  // shows stay on the task: they're in its Attachments, and removing them there is a separate choice.
+  const commentBody = { type: 'object', additionalProperties: false, required: ['body'], properties: { body: { type: 'string', minLength: 1, maxLength: 10000 } } };
+  async function loadComment(q, id) {
+    const c = (await q.query(`SELECT c.id, c.task_id, c.author_id, t.project_id, t.parent_id FROM comments c
+      JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
+      WHERE c.id = $1 AND t.deleted_at IS NULL AND p.archived_at IS NULL FOR UPDATE OF c`, [id])).rows[0];
+    if (!c) throw notFound('comment');
+    return c;
+  }
+  const commentOut = (c) => ({ id: c.id, body: c.body, authorId: c.author_id, createdAt: c.created_at, editedAt: c.edited_at });
+
+  app.patch('/api/comments/:id', { schema: { params: idParams, body: commentBody } }, async (req) => db.tx(async (t) => {
+    const body = req.body.body.trim();
+    if (!body) throw new HttpError(400, 'empty-comment', 'A comment needs some words, a file or an image.');
+    const c = await loadComment(t, req.params.id);
+    if (c.author_id !== req.user.id) throw new HttpError(403, 'not-yours', 'Only the person who wrote a comment can edit it.');
+    const row = (await t.query('UPDATE comments SET body = $2, edited_at = now() WHERE id = $1 RETURNING *', [c.id, body])).rows[0];
+    return { row, c };
+  }).then(async ({ row, c }) => {
+    await live.task(req, c.project_id, c.parent_id ?? c.task_id);
+    return { comment: commentOut(row) };
+  }));
+
+  app.delete('/api/comments/:id', { schema: { params: idParams } }, async (req) => db.tx(async (t) => {
+    const c = await loadComment(t, req.params.id);
+    if (c.author_id !== req.user.id && req.user.role !== 'admin') {
+      throw new HttpError(403, 'not-yours', 'Only the person who wrote a comment, or an admin, can delete it.');
+    }
+    await t.query('DELETE FROM comments WHERE id = $1', [c.id]);
+    await t.query(`DELETE FROM activity WHERE task_id = $1 AND kind = 'commented' AND data->>'commentId' = $2`, [c.task_id, c.id]);
+    return c;
+  }).then(async (c) => {
+    await live.task(req, c.project_id, c.parent_id ?? c.task_id);
+    return { ok: true };
+  }));
+
   app.put('/api/tasks/:id/like', { schema: { params: idParams } }, async (req) => {
     const task = await loadTask(db, req.params.id);
     await db.query('INSERT INTO task_likes (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [task.id, req.user.id]);

@@ -65,6 +65,9 @@ We copy Asana's board interactions, not its name, logo or artwork.
   never reset or turned off there, since its password rotates on the box.
 - Project names, for admins: the pencil beside the project's title (or a double-click on it) turns the name into
   a field; Enter saves, Escape keeps the old one. Members don't see the pencil, and the API refuses their renames.
+- Comments: web addresses are links. You edit your own comments (they say "edited") and delete them; an admin
+  can delete anyone's. Paste or drop an image or file into the comment box, or use its paperclip: it uploads to
+  the task's Attachments and shows in the comment. Deleting a comment leaves its files on the task.
 - Change password, for everyone except `admin`: needs the current password; other sessions end, this one stays.
 - Keyboard: Space picks a card up, the arrow keys move it, Space or Enter puts it down, Escape puts it back
   (Alt + arrows still moves in one step). Ctrl or Cmd + Enter completes the focused card or the open task.

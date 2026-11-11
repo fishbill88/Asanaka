@@ -73,6 +73,8 @@ export const api = {
   deleteTask: (id: string) => write<{ ok: true }>('DELETE', `/api/tasks/${id}`),
   addSubtask: (id: string, title: string) => write<{ task: Task }>('POST', `/api/tasks/${id}/subtasks`, { title }),
   addComment: (id: string, body: string) => write<{ comment: Comment }>('POST', `/api/tasks/${id}/comments`, { body }),
+  editComment: (id: string, body: string) => write<{ comment: Comment }>('PATCH', `/api/comments/${id}`, { body }),
+  deleteComment: (id: string) => write<{ ok: true }>('DELETE', `/api/comments/${id}`),
   like: (id: string, on: boolean) => write<{ task: Task }>(on ? 'PUT' : 'DELETE', `/api/tasks/${id}/like`),
 
   changePassword: (current: string, next: string) => request<{ ok: true }>('POST', '/api/me/password', { current, next }),

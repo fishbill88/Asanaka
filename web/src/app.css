@@ -254,7 +254,26 @@
 .pane-sub-check[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .pane-sub-check:disabled { opacity: 0.5; cursor: progress; }
 .pane-comment { display: grid; grid-template-columns: auto 1fr; gap: 10px; }
-.pane-comment-by { font-size: 14px; }
+.pane-comment-main { min-width: 0; }
+.pane-comment-by { font-size: 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+.pane-comment-acts { margin-left: auto; display: inline-flex; gap: 2px; }
+.pane-comment-act { min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; transition: background-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out); }
+.pane-comment-act:active { transform: scale(0.97); }
+.pane-comment-act[aria-expanded="true"] { background: var(--card); color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .pane-comment-act:hover { background: var(--card); color: var(--ink); } }
+@media (pointer: coarse) { .pane-comment-act { min-height: 36px; } }
+.pane-comment-edit { margin-top: 4px; display: grid; gap: 8px; }
+.pane-comment-edit textarea { width: 100%; resize: vertical; min-height: 72px; border: 0; border-radius: 14px; padding: 8px 12px; background: var(--card); font-size: 15px; line-height: 1.5; }
+.pane-comment-edit textarea:focus { outline: 3px solid var(--accent); outline-offset: 0; }
+.pane-comment-edit-row, .pane-comment-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pane-comment-confirm { margin-top: 8px; font-size: 14px; }
+.pane-comment-confirm span { margin-right: auto; }
+.pane-say-clip { width: 42px; height: 42px; border: 0; border-radius: 50%; display: grid; place-items: center; background: none; color: var(--muted); cursor: pointer; transition: background-color var(--t-hover) ease, color var(--t-hover) ease, transform var(--t-press) var(--ease-out); }
+.pane-say-clip svg { width: 20px; height: 20px; }
+.pane-say-clip:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .pane-say-clip:hover { background: var(--card); color: var(--ink); } }
+.pane-say.is-dropping textarea { outline: 3px dashed var(--accent); outline-offset: 0; }
+.bd-btn:disabled { opacity: 0.6; cursor: default; }
 .pane-comment-by span, .pane-event span { color: var(--muted); }
 .pane-comment-body { font-size: 15px; margin-top: 2px; padding: 8px 12px; border-radius: 4px 16px 16px 16px; background: var(--bg); overflow-wrap: anywhere; white-space: pre-wrap; }
 .text-link { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; border-radius: 4px; }
@@ -316,7 +335,7 @@
 .lightbox-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; color: var(--night-ink); font-size: 15px; cursor: default; }
 .lightbox-bar .bd-btn-quiet { color: var(--night-ink); }
 
-.pane-say { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: end; padding: 12px 16px 16px 20px; background: var(--sand); }
+.pane-say { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: end; padding: 12px 16px 16px 20px; background: var(--sand); }
 .pane-say .bd-avatar { margin-bottom: 8px; }
 .pane-say textarea { resize: none; min-height: 42px; max-height: 120px; border: 0; border-radius: 21px; padding: 10px 14px; background: var(--card); font-size: 15px; }
 .pane-say .bd-btn { min-height: 42px; }

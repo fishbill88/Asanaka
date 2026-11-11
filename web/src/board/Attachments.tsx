@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { attachmentUrl, isImage } from '../lib/api';
 import type { Attachment } from '../types';
+import { Linkify } from './Linkify';
 import { EASE_OUT, reduced } from './motion';
 
 // Images and files on a task: tiles in the pane, images inline in the description, a lightbox.
@@ -83,11 +84,15 @@ function InlineImage({ a, onOpen }: { a: Attachment; onOpen(): void }) {
 const MARK = /(!?)\[([^\]\n]{0,240})\]\((attachment|uploading):([\w-]{1,40})\)/g;
 export const markerFor = (a: Attachment) => `${isImage(a) ? '!' : ''}[${a.filename.replace(/[[\]\n]/g, '')}](attachment:${a.id})`;
 
-export function NotesView({ text, attachments, onOpen }: { text: string; attachments: Attachment[]; onOpen(a: Attachment): void }) {
+export const UPLOADING = '](uploading:';
+
+/** Text with file markers shown as images and chips; `links` also turns web addresses into links (comments). */
+export function NotesView({ text, attachments, onOpen, links = false }: { text: string; attachments: Attachment[]; onOpen(a: Attachment): void; links?: boolean }) {
   const out: ReactNode[] = [];
+  const plain = (s: string, key: number) => out.push(links ? <Linkify key={`t${key}`} text={s} /> : s);
   let last = 0;
   for (const m of text.matchAll(MARK)) {
-    if (m.index > last) out.push(text.slice(last, m.index));
+    if (m.index > last) plain(text.slice(last, m.index), last);
     const [, bang, name, kind, id] = m;
     const a = kind === 'attachment' ? attachments.find((x) => x.id === id) : undefined;
     if (kind === 'uploading') out.push(<span key={m.index} className="pane-chip is-busy">{name}</span>);
@@ -95,8 +100,10 @@ export function NotesView({ text, attachments, onOpen }: { text: string; attachm
     else if (bang && isImage(a)) out.push(<InlineImage key={m.index} a={a} onOpen={() => onOpen(a)} />);
     else out.push(<button key={m.index} type="button" className="pane-chip" onClick={(e) => { e.stopPropagation(); onOpen(a); }}>{a.filename}</button>);
     last = m.index + m[0].length;
+    // An image is its own block, so the line break typed after it would show as an empty line.
+    if (a && bang && isImage(a) && text[last] === '\n') last += 1;
   }
-  if (last < text.length) out.push(text.slice(last));
+  if (last < text.length) plain(text.slice(last), last);
   return <>{out}</>;
 }
 
